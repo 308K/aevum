@@ -77,12 +77,20 @@ export class EditPage extends LitElement {
     }
     .row {
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-columns: 1.15fr 1fr 1fr;
       gap: 10px;
+    }
+    .row > * {
+      min-width: 0;
     }
     md-outlined-text-field,
     md-outlined-select {
       width: 100%;
+    }
+    @media (max-width: 480px) {
+      .row {
+        gap: 8px;
+      }
     }
     .switch-row {
       display: flex;

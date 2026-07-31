@@ -6,6 +6,9 @@
   --md-ref-typeface-brand: var(--md-ref-typeface-plain);
   --app-max-width: 720px;
   --app-fab-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  /* 中西文自动间距：由浏览器在 CJK 与拉丁文/数字边界自动插入排版间距，
+     因此源码中不要手动在中西文之间加空格 */
+  text-autospace: normal;
 }
 
 * {

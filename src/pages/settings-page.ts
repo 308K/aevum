@@ -48,6 +48,7 @@ import { CALENDAR_IDS } from '../utils/calendar.js';
 import { exportBackup, importBackup } from '../utils/backup.js';
 import { icon } from '../icons.js';
 import { toast } from '../components/app-snackbar.js';
+import { isInstallable, onInstallAvailable, promptInstall } from '../install.js';
 import '../components/color-picker.js';
 
 const GRAN_I18N_KEYS: Record<Granularity, 'granDay' | 'granDhms' | 'granYmd' | 'granYwd' | 'granWd'> = {
@@ -93,6 +94,15 @@ export class SettingsPage extends LitElement {
     .item .label {
       font-size: 0.95rem;
       color: var(--md-sys-color-on-surface);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .item .label .exp-icon {
+      display: inline-flex;
+      color: var(--md-sys-color-tertiary);
+      cursor: help;
+      flex: none;
     }
     .item .hint {
       font-size: 0.78rem;
@@ -144,6 +154,20 @@ export class SettingsPage extends LitElement {
       gap: 10px;
       flex: none;
     }
+    /* 窄屏：导出/导入按钮移到文字下方，并占满整行便于点按 */
+    @media (max-width: 480px) {
+      .item.item-data {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .item.item-data .data-actions {
+        width: 100%;
+      }
+      .item.item-data .data-actions md-outlined-button {
+        flex: 1;
+      }
+    }
     .hidden-input {
       display: none;
     }
@@ -183,6 +207,29 @@ export class SettingsPage extends LitElement {
       gap: 10px;
       flex: 1;
     }
+    @media (max-width: 560px) {
+      .theme-create,
+      .tag-create {
+        flex-wrap: wrap;
+      }
+      /* 移动端：把名称输入框放到独立整行，避免被色块与按钮挤压得过窄 */
+      .theme-create .theme-name,
+      .tag-create .tag-name {
+        order: 3;
+        flex: 1 1 100%;
+      }
+      .theme-create md-outlined-button,
+      .tag-create md-outlined-button {
+        margin-left: auto;
+      }
+      .theme-row {
+        flex-wrap: wrap;
+      }
+      .theme-row .theme-name {
+        order: 4;
+        flex: 1 1 100%;
+      }
+    }
     .theme-empty {
       padding: 4px 0 6px;
       font-size: 0.82rem;
@@ -210,6 +257,7 @@ export class SettingsPage extends LitElement {
   @state() private newTagName = '';
   @state() private newThemeName = '';
   @state() private newThemeColor = getSettings().seedColor;
+  @state() private installAvailable = isInstallable();
 
   @query('#tagDeleteDialog') private tagDeleteDialog!: MdDialog;
   private pendingDeleteId: string | null = null;
@@ -220,12 +268,17 @@ export class SettingsPage extends LitElement {
   private unsubSettings?: () => void;
   private unsubLocale?: () => void;
   private unsubTags?: () => void;
+  private unsubInstall?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
     this.unsubSettings = onSettingsChange((s) => (this.settings = s));
     this.unsubLocale = onLocaleChange(() => this.requestUpdate());
     this.unsubTags = onTagsChange(() => (this.tagList = getTags()));
+    this.unsubInstall = onInstallAvailable(() => {
+      this.installAvailable = isInstallable();
+      this.requestUpdate();
+    });
   }
 
   disconnectedCallback() {
@@ -233,6 +286,7 @@ export class SettingsPage extends LitElement {
     this.unsubSettings?.();
     this.unsubLocale?.();
     this.unsubTags?.();
+    this.unsubInstall?.();
   }
 
   private set<K extends keyof AevumSettings>(key: K, value: AevumSettings[K]) {
@@ -290,10 +344,21 @@ export class SettingsPage extends LitElement {
   }
 
   private addCustomTheme() {
+    if (!this.newThemeName.trim()) {
+      toast(t('toastThemeNameEmpty'));
+      return;
+    }
     const { added } = addCustomTheme(this.newThemeName, this.newThemeColor);
     this.newThemeName = '';
     this.newThemeColor = getSettings().seedColor;
     toast(added ? t('toastThemeAdded') : t('toastThemeDupe'));
+  }
+
+  private async onInstallClick() {
+    const outcome = await promptInstall();
+    if (outcome === 'installed') toast(t('toastInstalled'));
+    else if (outcome === 'dismissed') toast(t('toastInstallCancelled'));
+    else toast(t('installManualHint'));
   }
 
   private requestDeleteTheme(id: string) {
@@ -354,6 +419,23 @@ export class SettingsPage extends LitElement {
               </md-outlined-select>
             </div>
           </div>
+          <div class="item">
+            <div>
+              <div class="label">${t('installToHome')}</div>
+              <div class="hint">${t('installHint')}</div>
+            </div>
+            ${this.installAvailable
+              ? html`<md-outlined-button @click=${this.onInstallClick}>
+                  <span class="btn-icon" slot="icon">${icon('download', 18)}</span>${t('installNow')}
+                </md-outlined-button>`
+              : html`<md-icon-button
+                  @click=${this.onInstallClick}
+                  aria-label=${t('installToHome')}
+                  title=${t('installManualHint')}
+                >
+                  ${icon('download', 20)}
+                </md-icon-button>`}
+          </div>
         </div>
       </div>
 
@@ -389,7 +471,15 @@ export class SettingsPage extends LitElement {
           </div>
           <div class="item">
             <div>
-              <div class="label">${t('settingsGradientBg')}</div>
+              <div class="label">
+                ${t('settingsGradientBg')}
+                <span
+                  class="exp-icon"
+                  title=${t('experimental')}
+                  aria-label=${t('experimental')}
+                  >${icon('science', 16)}</span
+                >
+              </div>
               <div class="hint">${t('settingsGradientBgHint')}</div>
             </div>
             <md-switch
@@ -423,6 +513,7 @@ export class SettingsPage extends LitElement {
                         .value=${th.name}
                         placeholder=${t('customThemeNamePlaceholder')}
                         aria-label=${t('customThemeNamePlaceholder')}
+                        supporting-text=${t('customThemeNameHint')}
                         @change=${(e: Event) => this.onThemeNameChange(e, th.id)}
                       ></md-outlined-text-field>
                       ${isActive
@@ -453,6 +544,7 @@ export class SettingsPage extends LitElement {
                 class="theme-name"
                 .value=${this.newThemeName}
                 placeholder=${t('customThemeNamePlaceholder')}
+                supporting-text=${t('customThemeNameHint')}
                 @input=${(e: Event) => (this.newThemeName = (e.target as HTMLInputElement).value)}
                 @keydown=${(e: KeyboardEvent) => {
                   if (e.key === 'Enter') {
@@ -567,7 +659,7 @@ export class SettingsPage extends LitElement {
       <div class="group">
         <div class="group-title">${t('settingsSectionData')}</div>
         <div class="card">
-          <div class="item">
+          <div class="item item-data">
             <div>
               <div class="label">${t('dataExport')} / ${t('dataImport')}</div>
               <div class="hint">${t('dataHint')}</div>

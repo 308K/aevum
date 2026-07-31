@@ -20,6 +20,7 @@ import { registerSW } from 'virtual:pwa-register';
 import { getSettings, onSettingsChange } from './store/settings.js';
 import { applyLocalePref } from './i18n.js';
 import { applyTheme } from './theme.js';
+import { initInstall } from './install.js';
 import './app.js';
 
 /* 初始化语言与主题，并跟随设置变更 */
@@ -39,3 +40,6 @@ bootstrapSettings();
 if ('serviceWorker' in navigator) {
   registerSW({ immediate: true });
 }
+
+/* PWA：捕获「安装到主屏幕」提示事件 */
+initInstall();

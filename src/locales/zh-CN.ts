@@ -113,7 +113,8 @@ export const zhCN = {
   themeDark: '暗色',
   settingsSeedColor: '主题色',
   settingsGradientBg: '渐变背景',
-  settingsGradientBgHint: '使用 OKLCH 色彩空间插值，过渡更平滑自然',
+  settingsGradientBgHint: '使用OKLCH色彩空间插值，过渡更平滑自然',
+  experimental: '实验性功能',
   settingsDayBoundary: '日界限',
   settingsDayBoundaryHint: '自定义一天的起始时刻，影响仅设置日期事件的天数计算',
   settingsDefaultCalendar: '默认历法',
@@ -123,7 +124,7 @@ export const zhCN = {
   settingsSectionData: '数据',
   dataExport: '导出备份',
   dataImport: '导入备份',
-  dataHint: '导出全部事件与设置为 JSON 文件；导入将覆盖当前所有事件',
+  dataHint: '导出全部事件与设置为JSON文件；导入将覆盖当前所有事件',
   toastExported: '已导出备份文件',
   toastImported: '已导入 {count} 个事件',
   toastImportFailed: '导入失败：文件格式无效',
@@ -133,7 +134,7 @@ export const zhCN = {
   actionClear: '清除',
   toastBgSet: '背景图已更新',
   toastBgCleared: '已恢复默认背景',
-  toastBgTooLarge: '图片过大，请选择 10MB 以内的图片',
+  toastBgTooLarge: '图片过大，请选择10MB以内的图片',
 
   // 分享
   actionShareImage: '保存为图片',
@@ -174,6 +175,15 @@ export const zhCN = {
   toastThemeDeleted: '主题色已删除',
   toastThemeDupe: '该颜色已存在，已切换至已有主题',
   toastThemeNameEmpty: '请输入主题色名称',
+  customThemeNameHint: '为这个主题色取个名字，方便在列表中识别',
+
+  // 安装到主屏幕（PWA）
+  installToHome: '安装到主屏幕',
+  installHint: '将Aevum安装到主屏幕，获得类似原生App的体验：离线可用、全屏运行、一键直达。',
+  installNow: '立即安装',
+  installManualHint: '未检测到自动安装入口。请在浏览器菜单中选择「添加到主屏幕」即可安装本应用。',
+  toastInstalled: '已安装到主屏幕',
+  toastInstallCancelled: '已取消安装',
 };
 
 export type LocaleDict = typeof zhCN;

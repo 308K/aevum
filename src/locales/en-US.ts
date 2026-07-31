@@ -105,6 +105,7 @@ export const enUS: LocaleDict = {
   settingsSeedColor: 'Theme color',
   settingsGradientBg: 'Gradient background',
   settingsGradientBgHint: 'Interpolated in OKLCH color space for smoother transitions',
+  experimental: 'Experimental',
   settingsDayBoundary: 'Day boundary',
   settingsDayBoundaryHint: 'Custom start of a day; affects day counting of date-only events',
   settingsDefaultCalendar: 'Default calendar',
@@ -164,4 +165,13 @@ export const enUS: LocaleDict = {
   toastThemeDeleted: 'Theme deleted',
   toastThemeDupe: 'Color already exists — switched to the existing theme',
   toastThemeNameEmpty: 'Please enter a theme name',
+  customThemeNameHint: 'Give this theme a name so you can recognize it in the list',
+
+  // Install to home screen (PWA)
+  installToHome: 'Install to Home Screen',
+  installHint: 'Install Aevum to your home screen for an app-like experience: works offline, runs fullscreen, and launches in one tap.',
+  installNow: 'Install',
+  installManualHint: 'No automatic install prompt detected. Open your browser menu and choose "Add to Home Screen" to install this app.',
+  toastInstalled: 'Installed to home screen',
+  toastInstallCancelled: 'Installation cancelled',
 };

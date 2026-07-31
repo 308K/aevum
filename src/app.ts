@@ -10,6 +10,8 @@ import { getSettings, onSettingsChange, updateSettings } from './store/settings.
 import { applyTheme } from './theme.js';
 import { applyLocalePref, onLocaleChange, t } from './i18n.js';
 import { icon } from './icons.js';
+import { isInstallable, onInstallAvailable, promptInstall } from './install.js';
+import { toast } from './components/app-snackbar.js';
 import './pages/home-page.js';
 import './pages/edit-page.js';
 import './pages/settings-page.js';
@@ -55,6 +57,51 @@ export class AevumApp extends LitElement {
     .topbar md-icon-button {
       color: var(--md-sys-color-on-surface-variant);
     }
+    .install-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0 12px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: color-mix(in oklch, var(--md-sys-color-primary-container) 78%, transparent);
+      border: 1px solid color-mix(in oklch, var(--md-sys-color-primary) 35%, transparent);
+    }
+    .install-banner .install-icon {
+      flex: none;
+      display: inline-flex;
+      color: var(--md-sys-color-on-primary-container);
+    }
+    .install-banner .install-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .install-banner .install-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--md-sys-color-on-primary-container);
+    }
+    .install-banner .install-sub {
+      font-size: 0.76rem;
+      color: var(--md-sys-color-on-primary-container);
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+    .install-banner .install-btn {
+      flex: none;
+    }
+    .install-banner .install-close {
+      flex: none;
+      color: var(--md-sys-color-on-primary-container);
+    }
+    @media (max-width: 480px) {
+      .install-banner {
+        flex-wrap: wrap;
+      }
+      .install-banner .install-btn {
+        margin-left: auto;
+      }
+    }
     main {
       max-width: var(--app-max-width, 720px);
       margin: 0 auto;
@@ -87,9 +134,12 @@ export class AevumApp extends LitElement {
 
   @state() private route: Route = 'home';
   @state() private themeMode: 'light' | 'dark' = 'light';
+  @state() private installAvailable = isInstallable();
+  @state() private installDismissed = false;
 
   private unsubSettings?: () => void;
   private unsubLocale?: () => void;
+  private unsubInstall?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
@@ -100,6 +150,10 @@ export class AevumApp extends LitElement {
 
     this.unsubSettings = onSettingsChange(() => this.applyAll());
     this.unsubLocale = onLocaleChange(() => this.requestUpdate());
+    this.unsubInstall = onInstallAvailable(() => {
+      this.installAvailable = isInstallable();
+      this.requestUpdate();
+    });
     window.addEventListener('hashchange', this.onHashChange);
     this.onHashChange();
   }
@@ -108,6 +162,7 @@ export class AevumApp extends LitElement {
     super.disconnectedCallback();
     this.unsubSettings?.();
     this.unsubLocale?.();
+    this.unsubInstall?.();
     window.removeEventListener('hashchange', this.onHashChange);
   }
 
@@ -145,6 +200,13 @@ export class AevumApp extends LitElement {
     updateSettings({ themeMode: next });
   }
 
+  private async onInstallClick() {
+    const outcome = await promptInstall();
+    if (outcome === 'installed') toast(t('toastInstalled'));
+    else if (outcome === 'dismissed') toast(t('toastInstallCancelled'));
+    else toast(t('installManualHint'));
+  }
+
   private get pageTitle(): string {
     if (this.route === 'settings') return t('pageSettingsTitle');
     if (this.route === 'edit') {
@@ -174,6 +236,21 @@ export class AevumApp extends LitElement {
       </header>
 
       <main>
+        ${this.route === 'home' && this.installAvailable && !this.installDismissed
+          ? html`<div class="install-banner" role="region" aria-label=${t('installToHome')}>
+              <span class="install-icon">${icon('download', 24)}</span>
+              <div class="install-text">
+                <div class="install-title">${t('installToHome')}</div>
+                <div class="install-sub">${t('installHint')}</div>
+              </div>
+              <md-filled-button class="install-btn" @click=${this.onInstallClick}>
+                <span slot="icon" style="display:inline-flex">${icon('download', 18)}</span>${t('installNow')}
+              </md-filled-button>
+              <md-icon-button class="install-close" @click=${() => (this.installDismissed = true)} aria-label=${t('actionClose')}>
+                ${icon('close', 20)}
+              </md-icon-button>
+            </div>`
+          : null}
         <div class="page" key=${this.route + location.hash}>
           ${this.route === 'home' ? html`<home-page></home-page>` : null}
           ${this.route === 'edit' ? html`<edit-page></edit-page>` : null}
