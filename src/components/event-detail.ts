@@ -9,6 +9,7 @@ import '@material/web/dialog/dialog.js';
 import '@material/web/button/text-button.js';
 import '@material/web/button/filled-button.js';
 import '@material/web/button/outlined-button.js';
+import '@material/web/iconbutton/icon-button.js';
 import type { AevumEvent, Recurrence } from '../types.js';
 import { getEvent, deleteEvent } from '../store/events.js';
 import { formatEventDateTime } from '../utils/calendar.js';
@@ -138,10 +139,39 @@ export class EventDetail extends LitElement {
     .actions {
       display: flex;
       gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
     }
     .btn-icon {
       display: inline-flex;
       align-items: center;
+    }
+    /* 头部标题 + 右上角关闭叉号 */
+    .dialog-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .dialog-title {
+      font-size: 1.35rem;
+      font-weight: 500;
+      color: var(--md-sys-color-on-surface);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+    .head-close {
+      flex: none;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    /* 窄屏：操作按钮换行并占满整行，避免挤在一排 */
+    @media (max-width: 480px) {
+      .actions > * {
+        flex: 1 1 40%;
+        min-width: 0;
+      }
     }
   `;
 
@@ -205,7 +235,12 @@ export class EventDetail extends LitElement {
     const recurring = ev?.recurrence && ev.recurrence !== 'none';
     return html`
       <md-dialog id="detailDialog">
-        <div slot="headline">${ev ? ev.name : ''}</div>
+        <div slot="headline" class="dialog-head">
+          <span class="dialog-title">${ev ? ev.name : ''}</span>
+          <md-icon-button class="head-close" @click=${this.close} aria-label=${t('actionClose')}>
+            ${icon('close', 20)}
+          </md-icon-button>
+        </div>
         <div slot="content">
           ${ev && eff
             ? html`
@@ -257,7 +292,6 @@ export class EventDetail extends LitElement {
           <md-outlined-button @click=${this.onEdit}>
             <span class="btn-icon" slot="icon">${icon('edit', 18)}</span>${t('actionEdit')}
           </md-outlined-button>
-          <md-filled-button @click=${this.close}>${t('actionClose')}</md-filled-button>
         </div>
       </md-dialog>
 

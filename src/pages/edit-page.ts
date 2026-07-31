@@ -5,6 +5,7 @@
  * - 仅日期 or 精确时间、展示粒度、彩色标签、置顶
  */
 import { LitElement, html, css } from 'lit';
+import { keyed } from 'lit/directives/keyed.js';
 import { customElement, state } from 'lit/decorators.js';
 import '@material/web/button/filled-button.js';
 import '@material/web/button/text-button.js';
@@ -268,8 +269,23 @@ export class EditPage extends LitElement {
         this.tags = [...ev.tags];
         this.pinned = ev.pinned;
         this.bgImage = ev.bgImage;
+        return;
       }
     }
+    // 新建事件：重置为初始状态，避免复用元素时沿用上一次（可能陈旧的）数据
+    this.editId = null;
+    this.name = '';
+    this.calendar = getSettings().defaultCalendar;
+    this.gregDate = new Date();
+    this.hasTime = false;
+    this.timeValue = '09:00';
+    this.granularity = getSettings().defaultGranularity;
+    this.recurrence = 'none';
+    this.tags = [];
+    this.pinned = false;
+    this.bgImage = undefined;
+    this.newTagName = '';
+    this.nameError = '';
   }
 
   disconnectedCallback() {
@@ -299,7 +315,8 @@ export class EditPage extends LitElement {
 
   private onCalendarChange(value: string) {
     this.calendar = value as CalendarId;
-    // 保持同一公历日期，仅切换历法视角
+    // 新建事件：切换历法时把目标日期同步为「今日」（按新历法视角），不再沿用旧历法的日期
+    if (!this.editId) this.gregDate = new Date();
     this.requestUpdate();
   }
 
@@ -447,33 +464,38 @@ export class EditPage extends LitElement {
 
         <div class="section-label">${t('fieldDate')}</div>
         <div class="row">
-          <md-outlined-select
-            label=${t('fieldYear')}
-            .value=${sel.yearKey}
-            @change=${(e: Event) => this.onDatePartChange('yearKey', this.fieldValue(e))}
-          >
-            ${this.years.map(
-              (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
-            )}
-          </md-outlined-select>
-          <md-outlined-select
-            label=${t('fieldMonth')}
-            .value=${sel.monthKey}
-            @change=${(e: Event) => this.onDatePartChange('monthKey', this.fieldValue(e))}
-          >
-            ${this.months.map(
-              (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
-            )}
-          </md-outlined-select>
-          <md-outlined-select
-            label=${t('fieldDay')}
-            .value=${sel.dayKey}
-            @change=${(e: Event) => this.onDatePartChange('dayKey', this.fieldValue(e))}
-          >
-            ${this.days.map(
-              (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
-            )}
-          </md-outlined-select>
+          ${keyed(
+            this.calendar,
+            html`
+              <md-outlined-select
+                label=${t('fieldYear')}
+                .value=${sel.yearKey}
+                @change=${(e: Event) => this.onDatePartChange('yearKey', this.fieldValue(e))}
+              >
+                ${this.years.map(
+                  (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
+                )}
+              </md-outlined-select>
+              <md-outlined-select
+                label=${t('fieldMonth')}
+                .value=${sel.monthKey}
+                @change=${(e: Event) => this.onDatePartChange('monthKey', this.fieldValue(e))}
+              >
+                ${this.months.map(
+                  (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
+                )}
+              </md-outlined-select>
+              <md-outlined-select
+                label=${t('fieldDay')}
+                .value=${sel.dayKey}
+                @change=${(e: Event) => this.onDatePartChange('dayKey', this.fieldValue(e))}
+              >
+                ${this.days.map(
+                  (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
+                )}
+              </md-outlined-select>
+            `
+          )}
         </div>
 
         <div class="switch-row">

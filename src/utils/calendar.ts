@@ -106,6 +106,27 @@ function keyPartsOf(date: Date, cal: CalendarId, displayLocale: string): KeyPart
       dayDisplay: lunarDayName(p.day ?? ''),
     };
   }
+  if (cal === 'japanese') {
+    // 年号（令和/平成/昭和…）使用 ja-JP 提取，确保无论界面语言都显示汉字年号
+    const jp = partsOf(fmt('ja-JP', 'japanese', { year: 'numeric', month: 'numeric', day: 'numeric', era: 'long' }), date);
+    const eraName = jp.era ?? '';
+    const yearInEra = jp.year ?? '';
+    const dp = partsOf(fmt(displayLocale, 'japanese', { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }), date);
+    const kp = partsOf(fmt('en-US', 'japanese', { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' }), date);
+    return {
+      // 键固定为「年号|年」，locale 无关、稳定
+      yearKey: `${eraName}|${yearInEra}`,
+      yearDisplay: displayLocale.startsWith('zh')
+        ? `${eraName}${yearInEra}年`
+        : dp.era
+          ? `${dp.era} ${dp.year}`
+          : yearInEra,
+      monthKey: kp.month ?? '',
+      monthDisplay: dp.month ?? '',
+      dayKey: kp.day ?? '',
+      dayDisplay: dp.day ?? '',
+    };
+  }
   // 其他历法：键使用 en（数字+era），显示使用当前语言
   const kp = partsOf(fmt('en-US', cal, { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' }), date);
   const dp = partsOf(fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }), date);
@@ -297,6 +318,10 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
   if (cal === 'chinese') {
     const p = partsOf(fmt('zh-CN', 'chinese', { year: 'numeric', month: 'long', day: 'numeric' }), date);
     return `${p.relatedYear}年 ${p.yearName}年 ${p.month}${lunarDayName(p.day ?? '')}`;
+  }
+  if (cal === 'japanese') {
+    // 强制 era:long，保证中文下显示年号（令和/平成…）而非缩写字母
+    return fmt(displayLocale, 'japanese', { year: 'numeric', month: 'long', day: 'numeric', era: 'long' }).format(date);
   }
   return fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }).format(date);
 }
