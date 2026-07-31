@@ -58,6 +58,11 @@ export function t(key: keyof LocaleDict, params?: Record<string, string | number
   return text;
 }
 
+/** 取指定语言下的词条（不依赖全局 currentLocale），用于需显式指定语言（如日期格式化）的场景 */
+export function tIn(key: keyof LocaleDict, locale: Locale): string {
+  return DICTS[locale][key] ?? DICTS['zh-CN'][key] ?? String(key);
+}
+
 /** 本地化数字（Intl.NumberFormat） */
 export function formatNumber(n: number): string {
   return new Intl.NumberFormat(currentLocale).format(n);

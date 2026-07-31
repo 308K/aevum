@@ -27,6 +27,16 @@ check('2025-01-29 农历', formatEventDate('2025-01-29', 'chinese', 'zh-CN'), '2
 // 腊八 2026-01-26 = 乙巳年腊月初八（relatedYear 2025：该农历年始于 2025，双纪年确保无歧义）
 check('2026-01-26 腊八', formatEventDate('2026-01-26', 'chinese', 'zh-CN'), '2025年 乙巳年 腊月初八');
 
+console.log('== 1.5 非公历纪元（era）本地化（规避 Android Chrome 裁减 ICU 的 era 错误）==');
+// 纪元名必须用权威映射，不依赖 Intl 的 era 字段（Android 上会退化成 “BC” 且未中文本地化）
+check('islamic 中文纪元', formatEventDate('2026-07-31', 'islamic', 'zh-CN'), '伊斯兰历1448年2月17日');
+check('islamic 英文纪元', formatEventDate('2026-07-31', 'islamic', 'en-US').endsWith('AH'), true);
+check('hebrew 中文纪元', formatEventDate('2026-07-31', 'hebrew', 'zh-CN').startsWith('希伯来历'), true);
+check('persian 中文纪元', formatEventDate('2026-07-31', 'persian', 'zh-CN').startsWith('波斯历'), true);
+check('buddhist 中文纪元', formatEventDate('2026-07-31', 'buddhist', 'zh-CN').startsWith('佛历'), true);
+// 年份键稳定且 locale 无关：历法id|年（不受 Android era bug 影响）
+check('islamic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic').yearKey, 'islamic|1448');
+
 console.log('== 2. 历法键 ↔ 公历 往返 ==');
 const cals: CalendarId[] = ['gregory', 'chinese', 'islamic', 'hebrew', 'persian', 'buddhist', 'japanese'];
 for (const cal of cals) {

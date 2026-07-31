@@ -62,6 +62,12 @@ export const enUS: LocaleDict = {
   calBuddhist: 'Buddhist',
   calJapanese: 'Japanese',
 
+  // Era names (override Android Chrome's clipped ICU era)
+  eraIslamic: 'AH',
+  eraHebrew: 'AM',
+  eraPersian: 'AP',
+  eraBuddhist: 'BE',
+
   unitYear: 'yr',
   unitMonth: 'mo',
   unitWeek: 'wk',

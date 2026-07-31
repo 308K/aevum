@@ -4,6 +4,8 @@
  * - 农历完全使用汉字显示，并同时展示公元纪年与干支纪年（如：2026年 丙午年 正月十五）
  * - 反向转换（历法日期 → 公历时间戳）通过 Intl 格式化扫描实现，带缓存，零第三方依赖
  */
+import { tIn, getLocale, type Locale } from '../i18n.js';
+import type { LocaleDict } from '../locales/zh-CN.js';
 import type { CalendarId } from '../types.js';
 
 export const CALENDAR_IDS: CalendarId[] = [
@@ -41,6 +43,38 @@ function lunarDayName(dayStr: string): string {
   const n = Number(dayStr);
   if (!Number.isInteger(n) || n < 1 || n > 30) return dayStr;
   return LUNAR_DAY_NAMES[n - 1];
+}
+
+/**
+ * 各非公历历法的纪元（era）词条 key。
+ *
+ * 背景：Android 版 Chrome 自带的 ICU 数据被裁剪，非公历 era 会返回错误值
+ *（如伊斯兰历退化成“BC”），且其它历法的 era 也未中文本地化；该问题在其它
+ * 平台/浏览器上并不存在。这里把纪元名称交给 i18n 字典（src/locales/*）管理，
+ * 通过 t() 取词，既覆盖 Intl 的 era 字段、保证全平台（含 Android）一致正确，
+ * 又不引入任何第三方日期库，且不破坏 i18n 可扩展性——新增语言只需在字典中
+ * 补充对应词条即可，无需改动此处的逻辑。
+ * 仅覆盖需要纪元前缀的历法；公历/农历/日本和历另有专门处理。
+ */
+const ERA_KEYS: Partial<Record<CalendarId, keyof LocaleDict>> = {
+  islamic: 'eraIslamic',
+  hebrew: 'eraHebrew',
+  persian: 'eraPersian',
+  buddhist: 'eraBuddhist',
+};
+
+/** 取某历法在指定界面语言下的纪元显示名（未知历法回退空串，由调用方决定） */
+function eraName(cal: CalendarId, locale: string): string {
+  const key = ERA_KEYS[cal];
+  if (!key) return '';
+  return tIn(key, resolveLocale(locale));
+}
+
+/** 将显示语言字符串解析为已注册 Locale（未注册时回退到当前界面语言） */
+function resolveLocale(locale: string): Locale {
+  if (locale.startsWith('zh')) return 'zh-CN';
+  if (locale.startsWith('en')) return 'en-US';
+  return getLocale();
 }
 
 /* ---------------- formatter 缓存 ---------------- */
@@ -127,11 +161,16 @@ function keyPartsOf(date: Date, cal: CalendarId, displayLocale: string): KeyPart
       dayDisplay: dp.day ?? '',
     };
   }
-  // 其他历法：键使用 en（数字+era），显示使用当前语言
+  // 其他历法（伊斯兰/希伯来/波斯/佛教）：纪元名称用权威映射覆盖，
+  // 避免依赖 Intl 的 era 字段（Android Chrome 的 ICU 会返回错误 era）。
+  // 年份数字仍由 Intl 正确计算（与 era 命名互相独立）。
   const kp = partsOf(fmt('en-US', cal, { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' }), date);
   const dp = partsOf(fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }), date);
-  const yearKey = `${kp.era ?? ''}|${kp.year ?? ''}`;
-  const yearDisplay = dp.era ? `${dp.era} ${dp.year}` : (dp.year ?? '');
+  const yearNum = kp.year ?? dp.year ?? '';
+  const era = eraName(cal, displayLocale);
+  // 键固定为「历法id|年」，locale 无关且不受 Android era bug 影响（更稳定）
+  const yearKey = `${cal}|${yearNum}`;
+  const yearDisplay = era ? `${era} ${yearNum}` : yearNum;
   return {
     yearKey,
     yearDisplay,
@@ -323,7 +362,13 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
     // 强制 era:long，保证中文下显示年号（令和/平成…）而非缩写字母
     return fmt(displayLocale, 'japanese', { year: 'numeric', month: 'long', day: 'numeric', era: 'long' }).format(date);
   }
-  return fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }).format(date);
+  // 其他历法：用原生 Intl 完整格式化（保留“月/日”单位、标点与正确顺序），
+  // 仅把 era 字段替换为权威映射值。好处：在完整 ICU 的平台上映射值与原值一致
+  //（等于无操作），在 Android Chrome 裁减 ICU 下则替换掉错误的 era（如“BC”），
+  // 从而全平台结果一致正确，且不引入任何第三方日期库。
+  const parts = fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric' }).formatToParts(date);
+  const era = eraName(cal, displayLocale);
+  return parts.map((p) => (p.type === 'era' ? era : p.value)).join('');
 }
 
 /** 目标日期 + 可选精确时间的组合展示 */

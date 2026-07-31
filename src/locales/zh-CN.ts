@@ -66,6 +66,12 @@ export const zhCN = {
   calBuddhist: '佛教历',
   calJapanese: '日本和历',
 
+  // 历法纪元名（用于覆盖 Android Chrome 被裁剪 ICU 的错误 era）
+  eraIslamic: '伊斯兰历',
+  eraHebrew: '希伯来历',
+  eraPersian: '波斯历',
+  eraBuddhist: '佛历',
+
   // 时间单位
   unitYear: '年',
   unitMonth: '个月',
