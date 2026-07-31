@@ -1,0 +1,23 @@
+{
+  "name": "aevum",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Aevum - 极简优雅的倒数日 PWA 应用",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@material/material-color-utilities": "^0.3.0",
+    "@material/web": "^2.3.0",
+    "lit": "^3.2.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "vite": "^5.4.19",
+    "vite-plugin-pwa": "^0.21.1"
+  }
+}

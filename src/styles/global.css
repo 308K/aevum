@@ -1,0 +1,79 @@
+/* Aevum 全局样式 —— Material 3 + OKLCH 渐变 */
+
+:root {
+  --md-ref-typeface-plain: system-ui, -apple-system, 'Segoe UI', Roboto,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --md-ref-typeface-brand: var(--md-ref-typeface-plain);
+  --app-max-width: 720px;
+  --app-fab-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--md-ref-typeface-plain);
+  background-color: var(--md-sys-color-surface, #fef7ff);
+  color: var(--md-sys-color-on-surface, #1d1b20);
+  /* 中西文自动间距排版 */
+  text-autospace: normal;
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* OKLCH 渐变背景：在 OKLCH 色彩空间插值，避免 RGB 渐变灰色死区 */
+body.gradient-bg {
+  background-image: linear-gradient(
+    in oklch,
+    var(--md-sys-color-surface-container-lowest) 0%,
+    color-mix(in oklch, var(--md-sys-color-primary-container) 42%, var(--md-sys-color-surface)) 58%,
+    color-mix(in oklch, var(--md-sys-color-tertiary-container) 34%, var(--md-sys-color-surface)) 100%
+  );
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+}
+
+aevum-app {
+  display: block;
+  min-height: 100vh;
+}
+
+/* Material Web 组件字体继承 */
+md-filled-button,
+md-outlined-button,
+md-text-button,
+md-outlined-text-field,
+md-filled-text-field,
+md-outlined-select,
+md-select-option,
+md-list,
+md-list-item,
+md-dialog,
+md-assist-chip,
+md-filter-chip {
+  font-family: var(--md-ref-typeface-plain);
+}
+
+::selection {
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+/* 细滚动条 */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--md-sys-color-outline-variant);
+  border-radius: 4px;
+}
