@@ -141,22 +141,29 @@ export class EditPage extends LitElement {
     .tag-toggle {
       display: inline-flex;
       align-items: center;
+      gap: 6px;
       padding: 7px 14px;
       border-radius: 999px;
       font-size: 0.82rem;
       font-weight: 500;
       font-family: inherit;
-      color: var(--tag-fg);
-      background: var(--tag-bg);
-      border: 1.5px solid transparent;
+      color: var(--md-sys-color-on-surface-variant);
+      background: color-mix(in oklch, var(--tag-color) 10%, var(--md-sys-color-surface-container));
+      border: 1.5px solid var(--md-sys-color-outline-variant);
       cursor: pointer;
-      transition: border-color 0.15s ease, filter 0.15s ease;
+      transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.15s ease;
     }
     .tag-toggle:hover {
       filter: brightness(1.04);
     }
     .tag-toggle.on {
-      border-color: color-mix(in oklch, var(--tag-fg) 60%, transparent);
+      color: var(--tag-fg);
+      background: color-mix(in oklch, var(--tag-color) 30%, var(--md-sys-color-surface-container));
+      border: 2px solid var(--tag-color);
+      font-weight: 700;
+    }
+    .tag-toggle .check {
+      display: inline-flex;
     }
     .custom-tag-row {
       display: grid;
@@ -337,7 +344,7 @@ export class EditPage extends LitElement {
   /* ---------- 标签（引用全局标签库） ---------- */
 
   private tagStyle(color: string): string {
-    return `--tag-bg: color-mix(in oklch, ${color} 22%, var(--md-sys-color-surface-container)); --tag-fg: color-mix(in oklch, ${color} 74%, var(--md-sys-color-on-surface));`;
+    return `--tag-color: ${color}; --tag-bg: color-mix(in oklch, ${color} 22%, var(--md-sys-color-surface-container)); --tag-fg: color-mix(in oklch, ${color} 74%, var(--md-sys-color-on-surface));`;
   }
 
   private toggleTag(id: string) {
@@ -545,12 +552,16 @@ export class EditPage extends LitElement {
         <div class="section-label">${t('fieldTags')}</div>
         <div class="tag-chips">
           ${getTags().map(
-            (tg: TagDef) => html`<button
-              type="button"
-              class="tag-toggle ${this.tags.includes(tg.id) ? 'on' : ''}"
-              style=${this.tagStyle(tg.color)}
-              @click=${() => this.toggleTag(tg.id)}
-            >${tagDisplay(tg)}</button>`
+            (tg: TagDef) => {
+              const on = this.tags.includes(tg.id);
+              return html`<button
+                type="button"
+                class="tag-toggle ${on ? 'on' : ''}"
+                style=${this.tagStyle(tg.color)}
+                aria-pressed=${on ? 'true' : 'false'}
+                @click=${() => this.toggleTag(tg.id)}
+              >${on ? html`<span class="check">${icon('check', 16)}</span>` : null}${tagDisplay(tg)}</button>`;
+            }
           )}
         </div>
         ${getTags().length === 0
