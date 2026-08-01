@@ -21,6 +21,7 @@ import { getLocale, t } from '../i18n.js';
 import { icon } from '../icons.js';
 
 const GRID_ID = 'aevum-cal-grid';
+const HINT_ID = 'aevum-cal-hint';
 
 function toISO(d: Date): string {
   const p = (n: number) => String(n).padStart(2, '0');
@@ -166,6 +167,12 @@ export class DateCalendar extends LitElement {
       display: flex;
       justify-content: center;
       margin-top: 10px;
+    }
+    .hint {
+      margin: 8px 2px 0;
+      font-size: 0.72rem;
+      line-height: 1.45;
+      color: var(--md-sys-color-on-surface-variant);
     }
     .today-btn {
       padding: 6px 18px;
@@ -430,7 +437,7 @@ export class DateCalendar extends LitElement {
           </button>
         </div>
 
-        <div class="grid" id=${GRID_ID} role="grid" aria-label=${headerLabel} @keydown=${this.onGridKeydown}>
+        <div class="grid" id=${GRID_ID} role="grid" aria-label=${headerLabel} aria-describedby=${HINT_ID} @keydown=${this.onGridKeydown}>
           <div class="weekdays" role="row">
             ${headers.map(
               (h) => html`<div class="wd" role="columnheader" aria-label=${h.long}>${h.narrow}</div>`
@@ -447,6 +454,8 @@ export class DateCalendar extends LitElement {
             </div>`
           )}
         </div>
+
+        <p class="hint" id=${HINT_ID}>${t('calKeyboardHint')}</p>
 
         <div class="footer">
           <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>

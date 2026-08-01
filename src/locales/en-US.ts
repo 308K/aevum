@@ -36,6 +36,7 @@ export const enUS: LocaleDict = {
   calPrevMonth: 'Previous month',
   calNextMonth: 'Next month',
   calToday: 'Today',
+  calKeyboardHint: 'Use arrow keys to move between dates, PageUp and PageDown to change months, Home and End to jump to the start or end of the row, and Enter or Space to select.',
   fieldPreciseTime: 'Precise time',
   fieldPreciseTimeHint: 'Enable to set hours and minutes',
   fieldGranularity: 'Display granularity',
