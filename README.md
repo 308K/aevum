@@ -55,8 +55,9 @@ bun scripts/smoke-themes.ts # 自定义主题色逻辑测试：增 / 删 / 改 /
 
 推荐部署到 [Cloudflare Pages](https://pages.cloudflare.com/)：
 
-- 构建命令：`bun run build`
+- 构建命令：`bun install && bun run build`
 - 输出目录：`dist`
+- 环境变量：`SKIP_DEPENDENCY_INSTALL` 值为 `true`
 - 已内置 PWA（service worker），构建后自动生成 `sw.js` 与 Web App Manifest。
 
 任何静态托管（GitHub Pages、Netlify、Vercel 等）均可，将输出目录设为 `dist` 即可。
