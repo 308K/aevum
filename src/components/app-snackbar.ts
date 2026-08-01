@@ -1,5 +1,10 @@
 /**
  * Material 3 风格 Snackbar（@material/web 无官方 Snackbar 组件，自实现）
+ * 无障碍要点：
+ * - 作为 ARIA 实时区域（role=status / alert + aria-live），内容变化时由读屏器播报
+ * - aria-atomic 保证整条信息被完整朗读
+ * - 关闭按钮为原生 <button>，可键盘聚焦与触发，带 aria-label 与可见焦点环
+ * - 尊重 prefers-reduced-motion，关闭位移动画
  */
 import { LitElement, html, css } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
@@ -59,12 +64,13 @@ export class AppSnackbar extends LitElement {
       color: inherit;
       cursor: pointer;
       pointer-events: auto;
-      opacity: 0.78;
-      transition: background 0.15s ease, opacity 0.15s ease;
+      transition: background 0.15s ease;
     }
     .close:hover {
-      opacity: 1;
       background: color-mix(in oklch, currentColor 12%, transparent);
+    }
+    .close:active {
+      background: color-mix(in oklch, currentColor 20%, transparent);
     }
     .close:focus-visible {
       outline: 2px solid var(--md-sys-color-inverse-primary);
@@ -73,10 +79,21 @@ export class AppSnackbar extends LitElement {
     .close svg {
       display: block;
     }
+    @media (prefers-reduced-motion: reduce) {
+      .bar {
+        transform: none;
+        transition: opacity 0.12s ease;
+      }
+      .bar.show {
+        transform: none;
+      }
+    }
   `;
 
   @state() private message = '';
   @state() private shown = false;
+  /** 是否为需要「强提醒」的错误型提示（assertive 播报） */
+  @state() private assertive = false;
   /** 显式跟踪当前主题，确保深浅色都正确取色（不依赖隐式继承） */
   @state() private dark = false;
 
@@ -93,8 +110,9 @@ export class AppSnackbar extends LitElement {
     this.unsub?.();
   }
 
-  show(message: string, duration = 2600) {
+  show(message: string, duration = 2600, assertive = false) {
     this.message = message;
+    this.assertive = assertive;
     this.shown = true;
     clearTimeout(this.hideTimer);
     this.hideTimer = setTimeout(() => (this.shown = false), duration);
@@ -108,7 +126,9 @@ export class AppSnackbar extends LitElement {
   render() {
     return html`<div
       class=${this.shown ? 'bar show' : 'bar'}
-      role="status"
+      role=${this.assertive ? 'alert' : 'status'}
+      aria-live=${this.assertive ? 'assertive' : 'polite'}
+      aria-atomic="true"
       data-theme=${this.dark ? 'dark' : 'light'}
     >
       <span class="msg">${this.message}</span>
@@ -127,10 +147,20 @@ declare global {
 
 /** 全局便捷调用：自管理一个 light DOM 单例，避免 shadow DOM 穿透问题 */
 let singleton: AppSnackbar | null = null;
-export function toast(message: string): void {
+function ensureSingleton(): AppSnackbar {
   if (!singleton) {
     singleton = document.createElement('app-snackbar');
     document.body.appendChild(singleton);
   }
-  singleton.show(message);
+  return singleton;
+}
+
+/** 普通提示（polite） */
+export function toast(message: string): void {
+  ensureSingleton().show(message);
+}
+
+/** 错误型提示（assertive，读屏器会强提醒） */
+export function toastError(message: string): void {
+  ensureSingleton().show(message, 3200, true);
 }

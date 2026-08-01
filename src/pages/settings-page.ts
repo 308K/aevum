@@ -47,7 +47,7 @@ import { onLocaleChange, t } from '../i18n.js';
 import { CALENDAR_IDS } from '../utils/calendar.js';
 import { exportBackup, importBackup } from '../utils/backup.js';
 import { icon } from '../icons.js';
-import { toast } from '../components/app-snackbar.js';
+import { toast, toastError } from '../components/app-snackbar.js';
 import { isInstallable, onInstallAvailable, promptInstall } from '../install.js';
 import '../components/color-picker.js';
 
@@ -396,7 +396,7 @@ export class SettingsPage extends LitElement {
       const count = await importBackup(file);
       toast(t('toastImported', { count }));
     } catch {
-      toast(t('toastImportFailed'));
+      toastError(t('toastImportFailed'));
     }
   }
 
