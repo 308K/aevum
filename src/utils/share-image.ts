@@ -208,13 +208,15 @@ export async function drawShareImage(
         ? 0.08 + intensity * 0.92
         : 0.1 + coverOpacity * 0.7;
 
-  // 高斯模糊：在卡片裁剪区内重绘一遍模糊后的背景图（磨砂玻璃效果）
+  // 高斯模糊（磨砂玻璃）：在卡片裁剪区内重绘「与底层背景同源」的整图模糊，
+  // 仅卡片区域被模糊，且模糊内容与卡片背后的背景严格对齐（不再对整图重新裁切缩放）。
   if (options.cardStyle === 'blur' && bgImg) {
     ctx.save();
     roundRect(ctx, cardX, cardY, cardW, cardH, 56);
     ctx.clip();
     if (typeof ctx.filter !== 'undefined') ctx.filter = `blur(${blurRadius}px)`;
-    drawCover(ctx, bgImg, cardX, cardY, cardW, cardH);
+    // 用与背景一致的整图铺底（0,0,W,H），而非按卡片尺寸重裁，避免模糊区与底层背景错位
+    drawCover(ctx, bgImg, 0, 0, W, H);
     if (typeof ctx.filter !== 'undefined') ctx.filter = 'none';
     ctx.restore();
   }
