@@ -221,6 +221,7 @@ export class ShareImagePage extends LitElement {
   @state() private dark = resolveDark(getSettings().themeMode);
   @state() private cardStyle: CardStyle = 'opaque';
   @state() private cardIntensity = 0.5;
+  @state() private cardOpacity = 0.5;
   @state() private saving = false;
 
   @query('#preview') private previewCanvas!: HTMLCanvasElement;
@@ -253,7 +254,8 @@ export class ShareImagePage extends LitElement {
       changed.has('seedColor') ||
       changed.has('dark') ||
       changed.has('cardStyle') ||
-      changed.has('cardIntensity')
+      changed.has('cardIntensity') ||
+      changed.has('cardOpacity')
     ) {
       this.renderPreview();
     }
@@ -265,6 +267,7 @@ export class ShareImagePage extends LitElement {
       dark: this.dark,
       cardStyle: this.cardStyle,
       cardIntensity: this.cardIntensity,
+      cardOpacity: this.cardOpacity,
       darkenBg: false,
     };
   }
@@ -295,6 +298,11 @@ export class ShareImagePage extends LitElement {
   private onIntensityChange(e: Event) {
     const el = e.target as HTMLElement & { value: number };
     this.cardIntensity = Math.max(0, Math.min(1, Number(el.value) / 100));
+  }
+
+  private onCoverOpacityChange(e: Event) {
+    const el = e.target as HTMLElement & { value: number };
+    this.cardOpacity = Math.max(0, Math.min(1, Number(el.value) / 100));
   }
 
   private onColorChange(e: CustomEvent<{ value: string }>) {
@@ -415,11 +423,9 @@ export class ShareImagePage extends LitElement {
                   </div>
                 </div>
 
-                ${this.cardStyle !== 'opaque'
+                ${this.cardStyle === 'translucent'
                   ? html`<div class="item">
-                      <div class="intensity-label">
-                        ${this.cardStyle === 'blur' ? t('shareImageBlurAmount') : t('shareImageOpacity')}
-                      </div>
+                      <div class="intensity-label">${t('shareImageOpacity')}</div>
                       <div class="control">
                         <md-slider
                           min="0"
@@ -427,10 +433,40 @@ export class ShareImagePage extends LitElement {
                           step="1"
                           .value=${Math.round(this.cardIntensity * 100)}
                           @input=${this.onIntensityChange}
-                          aria-label=${this.cardStyle === 'blur' ? t('shareImageBlurAmount') : t('shareImageOpacity')}
+                          aria-label=${t('shareImageOpacity')}
                         ></md-slider>
                       </div>
                     </div>`
+                  : ''}
+                ${this.cardStyle === 'blur'
+                  ? html`
+                      <div class="item">
+                        <div class="intensity-label">${t('shareImageBlurAmount')}</div>
+                        <div class="control">
+                          <md-slider
+                            min="0"
+                            max="100"
+                            step="1"
+                            .value=${Math.round(this.cardIntensity * 100)}
+                            @input=${this.onIntensityChange}
+                            aria-label=${t('shareImageBlurAmount')}
+                          ></md-slider>
+                        </div>
+                      </div>
+                      <div class="item">
+                        <div class="intensity-label">${t('shareImageCoverOpacity')}</div>
+                        <div class="control">
+                          <md-slider
+                            min="0"
+                            max="100"
+                            step="1"
+                            .value=${Math.round(this.cardOpacity * 100)}
+                            @input=${this.onCoverOpacityChange}
+                            aria-label=${t('shareImageCoverOpacity')}
+                          ></md-slider>
+                        </div>
+                      </div>
+                    `
                   : ''}
               </div>
             </div>

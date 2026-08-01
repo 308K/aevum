@@ -174,6 +174,7 @@ export const zhCN = {
   shareImageCardBlur: '高斯模糊',
   shareImageOpacity: '透明度',
   shareImageBlurAmount: '模糊程度',
+  shareImageCoverOpacity: '覆盖浓度',
   shareImageSectionPreview: '预览',
   shareImagePreview: '图片预览',
   shareImageSelectEventHint: '请选择一个事件',

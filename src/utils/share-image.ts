@@ -28,8 +28,10 @@ export interface ShareImageOptions {
   dark: boolean;
   /** 卡片覆盖：不透明 / 半透明 / 高斯模糊 */
   cardStyle: CardStyle;
-  /** 卡片覆盖强度 0..1：半透明时控制不透明度、高斯模糊时控制模糊半径与覆盖浓度（opaque 时忽略） */
+  /** 卡片覆盖强度 0..1：半透明时控制不透明度、高斯模糊时控制模糊半径（opaque 时忽略） */
   cardIntensity: number;
+  /** 卡片覆盖浓度 0..1：仅高斯模糊模式使用，独立控制卡片表面不透明度（0.1..0.8） */
+  cardOpacity: number;
   /** 是否压暗背景图（默认 false：保留背景图原色，靠卡片覆盖保证可读） */
   darkenBg: boolean;
 }
@@ -146,6 +148,7 @@ function normalizeOptions(opts?: Partial<ShareImageOptions>): ShareImageOptions 
     dark,
     cardStyle: opts?.cardStyle ?? 'opaque',
     cardIntensity: opts?.cardIntensity ?? 0.5,
+    cardOpacity: opts?.cardOpacity ?? 0.5,
     darkenBg: opts?.darkenBg ?? false,
   };
 }
@@ -193,15 +196,17 @@ export async function drawShareImage(
   const cardW = W - PAD * 2;
   const cardH = H - PAD * 2 - 40;
 
-  // 覆盖强度：半透明控制不透明度、高斯模糊控制模糊半径与覆盖浓度（opaque 忽略）
+  // 覆盖强度：半透明控制不透明度、高斯模糊控制模糊半径（opaque 忽略）
   const intensity = Math.max(0, Math.min(1, options.cardIntensity));
-  const blurRadius = 4 + intensity * 76;
+  // 高斯模糊：模糊半径 4..60px（cardIntensity 驱动），卡片覆盖浓度 0.1..0.8（cardOpacity 独立驱动）
+  const blurRadius = 4 + intensity * 56;
+  const coverOpacity = Math.max(0, Math.min(1, options.cardOpacity));
   const cardAlpha =
     options.cardStyle === 'opaque'
       ? 1
       : options.cardStyle === 'translucent'
         ? 0.08 + intensity * 0.92
-        : 0.15 + intensity * 0.65;
+        : 0.1 + coverOpacity * 0.7;
 
   // 高斯模糊：在卡片裁剪区内重绘一遍模糊后的背景图（磨砂玻璃效果）
   if (options.cardStyle === 'blur' && bgImg) {

@@ -165,6 +165,7 @@ export const enUS: LocaleDict = {
   shareImageCardBlur: 'Blur',
   shareImageOpacity: 'Opacity',
   shareImageBlurAmount: 'Blur amount',
+  shareImageCoverOpacity: 'Cover opacity',
   shareImageSectionPreview: 'Preview',
   shareImagePreview: 'Image preview',
   shareImageSelectEventHint: 'Select an event',
