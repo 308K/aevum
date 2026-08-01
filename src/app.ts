@@ -263,8 +263,6 @@ export class AevumApp extends LitElement {
             <span class="fab-icon" slot="icon">${icon('add')}</span>
           </md-fab>`
         : null}
-
-      <app-snackbar></app-snackbar>
     `;
   }
 }
