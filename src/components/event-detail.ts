@@ -17,7 +17,6 @@ import { effectiveEvent } from '../utils/time-calc.js';
 import { parseBoundary } from '../utils/time-calc.js';
 import { getSettings } from '../store/settings.js';
 import { resolveEventTags, tagDisplay } from '../store/tags.js';
-import { saveEventShareImage } from '../utils/share-image.js';
 import { getLocale, t, formatGregorian } from '../i18n.js';
 import { icon } from '../icons.js';
 import { toast } from './app-snackbar.js';
@@ -203,20 +202,12 @@ export class EventDetail extends LitElement {
     this.confirmDialog.show();
   }
 
-  private sharing = false;
-
-  private async onShareImage() {
-    const ev = this.ev;
-    if (!ev || this.sharing) return;
-    this.sharing = true;
-    try {
-      await saveEventShareImage(ev);
-      toast(t('toastImageSaved'));
-    } catch {
-      /* 用户环境不支持 canvas 导出时静默失败 */
-    } finally {
-      this.sharing = false;
-    }
+  private onShareImage() {
+    const id = this.eventId;
+    if (!id) return;
+    this.close();
+    // 路由到专用的「保存为图片」页面，预选当前事件以便自定义主题/背景/卡片覆盖
+    location.hash = `#/share-image?id=${encodeURIComponent(id)}`;
   }
 
   private onDeleteConfirm() {

@@ -15,9 +15,10 @@ import { toast } from './components/app-snackbar.js';
 import './pages/home-page.js';
 import './pages/edit-page.js';
 import './pages/settings-page.js';
+import './pages/share-image-page.js';
 import './components/app-snackbar.js';
 
-type Route = 'home' | 'edit' | 'settings';
+type Route = 'home' | 'edit' | 'settings' | 'share-image';
 
 @customElement('aevum-app')
 export class AevumApp extends LitElement {
@@ -182,6 +183,7 @@ export class AevumApp extends LitElement {
     const path = hash.split('?')[0];
     if (path.startsWith('#/edit')) this.route = 'edit';
     else if (path.startsWith('#/settings')) this.route = 'settings';
+    else if (path.startsWith('#/share-image')) this.route = 'share-image';
     else this.route = 'home';
     // 路由切换时重建编辑页（保证表单按 id 重新初始化）
     this.requestUpdate();
@@ -193,6 +195,10 @@ export class AevumApp extends LitElement {
 
   private goSettings() {
     location.hash = '#/settings';
+  }
+
+  private goShareImage() {
+    location.hash = '#/share-image';
   }
 
   private goEdit() {
@@ -214,6 +220,7 @@ export class AevumApp extends LitElement {
 
   private get pageTitle(): string {
     if (this.route === 'settings') return t('pageSettingsTitle');
+    if (this.route === 'share-image') return t('pageShareImageTitle');
     if (this.route === 'edit') {
       const params = new URLSearchParams(location.hash.split('?')[1] ?? '');
       return params.get('id') ? t('pageEditTitleEdit') : t('pageEditTitleNew');
@@ -235,9 +242,12 @@ export class AevumApp extends LitElement {
         <md-icon-button @click=${this.toggleTheme} aria-label=${t('settingsThemeMode')}>
           ${icon(this.themeMode === 'dark' ? 'lightMode' : 'darkMode')}
         </md-icon-button>
-        ${isHome
-          ? html`<md-icon-button @click=${this.goSettings} aria-label=${t('navSettings')}>${icon('settings')}</md-icon-button>`
-          : null}
+          ${isHome
+            ? html`<md-icon-button @click=${this.goShareImage} aria-label=${t('navShareImage')}>${icon('image')}</md-icon-button>`
+            : null}
+          ${isHome
+            ? html`<md-icon-button @click=${this.goSettings} aria-label=${t('navSettings')}>${icon('settings')}</md-icon-button>`
+            : null}
       </header>
 
       <main>
@@ -260,6 +270,7 @@ export class AevumApp extends LitElement {
           ${this.route === 'home' ? html`<home-page></home-page>` : null}
           ${this.route === 'edit' ? html`<edit-page></edit-page>` : null}
           ${this.route === 'settings' ? html`<settings-page></settings-page>` : null}
+          ${this.route === 'share-image' ? html`<share-image-page></share-image-page>` : null}
         </div>
       </main>
 

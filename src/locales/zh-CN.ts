@@ -158,6 +158,26 @@ export const zhCN = {
   actionShareImage: '保存为图片',
   toastImageSaved: '图片已保存',
 
+  // 保存为图片（专用页面）
+  pageShareImageTitle: '保存为图片',
+  navShareImage: '保存为图片',
+  shareImageSectionEvent: '事件',
+  shareImageEvent: '选择事件',
+  shareImageSectionStyle: '样式',
+  shareImageThemeColor: '主题色',
+  shareImageBackgroundMode: '背景',
+  shareImageBgLight: '亮色',
+  shareImageBgDark: '暗色',
+  shareImageCardStyle: '卡片覆盖',
+  shareImageCardOpaque: '不透明',
+  shareImageCardTranslucent: '半透明',
+  shareImageCardBlur: '高斯模糊',
+  shareImageSectionPreview: '预览',
+  shareImagePreview: '图片预览',
+  shareImageSelectEventHint: '请选择一个事件',
+  shareImageNoEvents: '还没有事件，请先在首页添加',
+  shareImageGenerating: '生成中…',
+
   // 标签预设
   tagLife: '生活',
   tagWork: '工作',

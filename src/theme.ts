@@ -90,6 +90,28 @@ export function onThemeChange(fn: Listener): () => void {
   return () => listeners.delete(fn);
 }
 
+/**
+ * 给定种子色与亮暗，返回完整 M3 配色映射（kebab 命名的 --md-sys-color-* 键 + 中性 surface 色阶）。
+ * 供离屏渲染（分享图）等需要「独立派生一套配色」的场景使用，不依赖当前页面 DOM 主题。
+ */
+export function getSchemeColors(seed: string, dark: boolean): Record<string, string> {
+  const theme = themeFromSourceColor(argbFromHex(seed));
+  const scheme = (dark ? theme.schemes.dark : theme.schemes.light) as unknown as Record<string, number>;
+  const map: Record<string, string> = {};
+  for (const token of SCHEME_TOKENS) {
+    const argb = scheme[token];
+    if (typeof argb === 'number') map[camelToKebab(token)] = hexFromArgb(argb);
+  }
+  const neutral = theme.palettes.neutral;
+  const tones = dark
+    ? { surfaceDim: 6, surfaceBright: 24, surfaceContainerLowest: 4, surfaceContainerLow: 10, surfaceContainer: 12, surfaceContainerHigh: 17, surfaceContainerHighest: 22 }
+    : { surfaceDim: 87, surfaceBright: 98, surfaceContainerLowest: 100, surfaceContainerLow: 96, surfaceContainer: 94, surfaceContainerHigh: 92, surfaceContainerHighest: 90 };
+  for (const [token, tone] of Object.entries(tones)) {
+    map[camelToKebab(token)] = hexFromArgb(neutral.tone(tone));
+  }
+  return map;
+}
+
 /* 系统亮暗变化时，若当前为跟随系统则自动重放主题 */
 media.addEventListener('change', () => {
   if (lastSettings && lastSettings.themeMode === 'system') {

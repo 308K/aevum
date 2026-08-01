@@ -1,6 +1,6 @@
 /**
  * 事件分享卡片：Canvas 2D 手绘 PNG（不依赖 DOM 截图，Shadow DOM 兼容）
- * 配色读取当前 M3 主题变量，亮暗模式自适应
+ * 配色由「种子色 + 亮暗」独立派生（不依赖当前页面主题），支持自定义背景图与不压暗、卡片覆盖（不透明/半透明/高斯模糊）
  */
 import type { AevumEvent } from '../types.js';
 import { getSettings } from '../store/settings.js';
@@ -9,17 +9,55 @@ import { formatSegments, statusLabel } from './format.js';
 import { formatEventDateTime } from './calendar.js';
 import { resolveEventTags, tagDisplay } from '../store/tags.js';
 import { getLocale, t } from '../i18n.js';
+import { getSchemeColors, resolveDark } from '../theme.js';
 import { downloadBlob } from './backup.js';
 
-const W = 1080;
-const H = 1200;
+export const W = 1080;
+export const H = 1200;
 const PAD = 88;
 
 const FONT = `system-ui, -apple-system, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans SC', sans-serif`;
 
-function cssVar(name: string, fallback: string): string {
-  const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return v || fallback;
+/** 卡片覆盖样式 */
+export type CardStyle = 'opaque' | 'translucent' | 'blur';
+
+export interface ShareImageOptions {
+  /** 主题种子色 hex */
+  themeColor: string;
+  /** 亮 / 暗背景 */
+  dark: boolean;
+  /** 卡片覆盖：不透明 / 半透明 / 高斯模糊 */
+  cardStyle: CardStyle;
+  /** 是否压暗背景图（默认 false：保留背景图原色，靠卡片覆盖保证可读） */
+  darkenBg: boolean;
+}
+
+interface SchemeColors {
+  surface: string;
+  primary: string;
+  primaryContainer: string;
+  tertiaryContainer: string;
+  onSurface: string;
+  onSurfaceVariant: string;
+  outlineVariant: string;
+  tertiary: string;
+  surfaceContainer: string;
+}
+
+function hexToRgb(hex: string): [number, number, number] | null {
+  const h = (hex || '').trim().replace('#', '');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return null;
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/** 给 hex 颜色附加 alpha（0..1），非法输入原样返回 */
+function withAlpha(hex: string, alpha: number): string {
+  const rgb = hexToRgb(hex);
+  if (!rgb) return hex;
+  const a = Math.round(Math.max(0, Math.min(1, alpha)) * 255)
+    .toString(16)
+    .padStart(2, '0');
+  return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}${a}`;
 }
 
 function roundRect(
@@ -66,55 +104,116 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
-/** 生成分享图并触发下载 */
-export async function saveEventShareImage(ev: AevumEvent): Promise<void> {
-  const canvas = document.createElement('canvas');
+/** 等比 cover 绘制：把图片铺满 (x,y,w,h) 区域（溢出裁切） */
+function drawCover(
+  ctx: CanvasRenderingContext2D,
+  img: HTMLImageElement,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): void {
+  const scale = Math.max(w / img.width, h / img.height);
+  const dw = img.width * scale;
+  const dh = img.height * scale;
+  ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+}
+
+function resolveScheme(themeColor: string, dark: boolean): SchemeColors {
+  const m = getSchemeColors(themeColor, dark);
+  // 注意：getSchemeColors 的键是 kebab-case（如 'primary-container'），此处须按 kebab 读取，
+  // 否则会命中硬编码兜底值，导致背景等不随主题色变化。
+  return {
+    surface: m.surface || (dark ? '#1D1B20' : '#FEF7FF'),
+    primary: m.primary || (dark ? '#D0BCFF' : '#6750A4'),
+    primaryContainer: m['primary-container'] || (dark ? '#4F378B' : '#EADDFF'),
+    tertiaryContainer: m['tertiary-container'] || (dark ? '#4A2532' : '#FFD8E4'),
+    onSurface: m['on-surface'] || (dark ? '#E6E1E5' : '#1D1B20'),
+    onSurfaceVariant: m['on-surface-variant'] || (dark ? '#CAC4D0' : '#49454F'),
+    outlineVariant: m['outline-variant'] || (dark ? '#49454F' : '#CAC4D0'),
+    tertiary: m.tertiary || (dark ? '#EFB8C8' : '#7D5260'),
+    surfaceContainer: m['surface-container'] || m['surface-container-high'] || (dark ? '#211F26' : '#E6E0E9'),
+  };
+}
+
+function normalizeOptions(opts?: Partial<ShareImageOptions>): ShareImageOptions {
+  const s = getSettings();
+  const dark = opts?.dark ?? resolveDark(s.themeMode);
+  return {
+    themeColor: opts?.themeColor ?? s.seedColor,
+    dark,
+    cardStyle: opts?.cardStyle ?? 'opaque',
+    darkenBg: opts?.darkenBg ?? false,
+  };
+}
+
+/**
+ * 在给定 canvas 上绘制分享图（纯绘制，不触发下载）。
+ * 调用方需保证 canvas 尺寸为 W × H。
+ */
+export async function drawShareImage(
+  canvas: HTMLCanvasElement,
+  ev: AevumEvent,
+  opts?: Partial<ShareImageOptions>
+): Promise<void> {
+  const options = normalizeOptions(opts);
   canvas.width = W;
   canvas.height = H;
   const ctx = canvas.getContext('2d');
   if (!ctx) throw new Error('canvas-2d-unavailable');
+  ctx.clearRect(0, 0, W, H);
 
-  const colors = {
-    surface: cssVar('--md-sys-color-surface', '#FEF7FF'),
-    primary: cssVar('--md-sys-color-primary', '#6750A4'),
-    primaryContainer: cssVar('--md-sys-color-primary-container', '#EADDFF'),
-    onSurface: cssVar('--md-sys-color-on-surface', '#1D1B20'),
-    onSurfaceVariant: cssVar('--md-sys-color-on-surface-variant', '#49454F'),
-    outlineVariant: cssVar('--md-sys-color-outline-variant', '#CAC4D0'),
-    tertiary: cssVar('--md-sys-color-tertiary', '#7D5260'),
-  };
+  const colors = resolveScheme(options.themeColor, options.dark);
 
-  // —— 背景：事件背景图（封面铺底 + 纱罩）或 OKLCH 渐变 ——
+  // —— 背景：事件背景图（铺底，不压暗）或 OKLCH 风格渐变 ——
   const bgImg = ev.bgImage ? await loadImage(ev.bgImage) : null;
   if (bgImg) {
-    const scale = Math.max(W / bgImg.width, H / bgImg.height);
-    const dw = bgImg.width * scale;
-    const dh = bgImg.height * scale;
-    ctx.drawImage(bgImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
-    // 纱罩：让卡片从背景中凸显，同时保留图片氛围
-    ctx.fillStyle = /^#[0-9a-fA-F]{6}$/.test(colors.surface) ? `${colors.surface}B3` : colors.surface;
-    ctx.fillRect(0, 0, W, H);
+    drawCover(ctx, bgImg, 0, 0, W, H);
+    // 仅在用户显式要求（旧行为）时才压暗背景图；默认保留原色，可读性由卡片覆盖保证
+    if (options.darkenBg) {
+      ctx.fillStyle = withAlpha(colors.surface, 0.7);
+      ctx.fillRect(0, 0, W, H);
+    }
   } else {
     const bg = ctx.createLinearGradient(0, 0, W, H);
+    // 两个端点均取自种子色派生色阶（primaryContainer / tertiaryContainer），
+    // 主题的选定色会同时影响卡片外缘背景与（半透明/模糊卡片时）透出的底色。
     bg.addColorStop(0, colors.primaryContainer);
-    bg.addColorStop(1, colors.surface);
+    bg.addColorStop(1, colors.tertiaryContainer);
     ctx.fillStyle = bg;
     ctx.fillRect(0, 0, W, H);
   }
 
-  // —— 主卡片 ——
+  // —— 主卡片几何 ——
   const cardX = PAD;
   const cardY = PAD + 20;
   const cardW = W - PAD * 2;
   const cardH = H - PAD * 2 - 40;
+
+  // 高斯模糊：在卡片裁剪区内重绘一遍模糊后的背景图（磨砂玻璃效果）
+  if (options.cardStyle === 'blur' && bgImg) {
+    ctx.save();
+    roundRect(ctx, cardX, cardY, cardW, cardH, 56);
+    ctx.clip();
+    if (typeof ctx.filter !== 'undefined') ctx.filter = 'blur(40px)';
+    drawCover(ctx, bgImg, cardX, cardY, cardW, cardH);
+    if (typeof ctx.filter !== 'undefined') ctx.filter = 'none';
+    ctx.restore();
+  }
+
+  // 卡片填充：按覆盖样式决定不透明度
+  const cardAlpha =
+    options.cardStyle === 'opaque' ? 1 : options.cardStyle === 'translucent' ? 0.84 : 0.62;
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.18)';
   ctx.shadowBlur = 48;
   ctx.shadowOffsetY = 16;
   roundRect(ctx, cardX, cardY, cardW, cardH, 56);
-  ctx.fillStyle = colors.surface;
+  ctx.fillStyle = withAlpha(colors.surface, cardAlpha);
   ctx.fill();
   ctx.restore();
+
+  // 卡片描边
   roundRect(ctx, cardX, cardY, cardW, cardH, 56);
   ctx.strokeStyle = colors.outlineVariant;
   ctx.lineWidth = 2;
@@ -155,7 +254,6 @@ export async function saveEventShareImage(ev: AevumEvent): Promise<void> {
   const minSize = 96;
   const gap = 56;
   const maxRowW = cardW - 120;
-  // 自适应缩放直到整行放下
   for (;;) {
     ctx.font = `700 ${valueSize}px ${FONT}`;
     const total =
@@ -230,7 +328,6 @@ export async function saveEventShareImage(ev: AevumEvent): Promise<void> {
   ctx.fillStyle = colors.onSurfaceVariant;
   ctx.fillText(`${t('appName')} · ${t('appSubtitle')}`, cx, footerY);
 
-  // 产品域名（分享图须包含，便于识别来源）+ 链接图标
   const domainY = footerY + 48;
   const domainText = 'aevum.kkn.moe';
   ctx.font = `600 34px ${FONT}`;
@@ -251,8 +348,14 @@ export async function saveEventShareImage(ev: AevumEvent): Promise<void> {
   ctx.textAlign = 'left';
   ctx.fillText(domainText, groupX + iconSize + iconGap, domainY);
   ctx.textAlign = 'center';
+}
 
-  // —— 导出下载 ——
+/** 生成分享图并触发下载 */
+export async function saveEventShareImage(ev: AevumEvent, opts?: Partial<ShareImageOptions>): Promise<void> {
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  await drawShareImage(canvas, ev, opts);
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
   if (!blob) throw new Error('png-encode-failed');
   const safeName = ev.name.replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'event';
