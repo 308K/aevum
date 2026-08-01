@@ -224,10 +224,33 @@ export async function saveEventShareImage(ev: AevumEvent): Promise<void> {
     ctx.textAlign = 'center';
   }
 
-  // —— 页脚 ——
+  // —— 页脚：应用名 · 副标题 + 产品域名 ——
+  const footerY = cardY + cardH - 64;
   ctx.font = `400 32px ${FONT}`;
   ctx.fillStyle = colors.onSurfaceVariant;
-  ctx.fillText(`${t('appName')} · ${t('appSubtitle')}`, cx, cardY + cardH - 64);
+  ctx.fillText(`${t('appName')} · ${t('appSubtitle')}`, cx, footerY);
+
+  // 产品域名（分享图须包含，便于识别来源）+ 链接图标
+  const domainY = footerY + 48;
+  const domainText = 'aevum.kkn.moe';
+  ctx.font = `600 34px ${FONT}`;
+  ctx.fillStyle = colors.primary;
+  const domainW = ctx.measureText(domainText).width;
+  const linkPath =
+    'M3.9 12c0-1.71 1.39-3.1 3.1-3.1h4V7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h4v-1.9H7c-1.71 0-3.1-1.39-3.1-3.1zM8 13h8v-2H8v2zm9-6h-4v1.9h4c1.71 0 3.1 1.39 3.1 3.1s-1.39 3.1-3.1 3.1h-4V17h4c2.76 0 5-2.24 5-5s-2.24-5-5-5z';
+  const iconSize = 30;
+  const iconGap = 12;
+  const iconCenterY = domainY - 34 * 0.35;
+  const groupW = iconSize + iconGap + domainW;
+  const groupX = cx - groupW / 2;
+  ctx.save();
+  ctx.translate(groupX, iconCenterY - iconSize / 2);
+  ctx.scale(iconSize / 24, iconSize / 24);
+  ctx.fill(new Path2D(linkPath));
+  ctx.restore();
+  ctx.textAlign = 'left';
+  ctx.fillText(domainText, groupX + iconSize + iconGap, domainY);
+  ctx.textAlign = 'center';
 
   // —— 导出下载 ——
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
