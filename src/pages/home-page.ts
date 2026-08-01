@@ -12,8 +12,8 @@ import '../components/event-card.js';
 import '../components/event-detail.js';
 import type { EventDetail } from '../components/event-detail.js';
 
-/** 跨导航保持的筛选状态（首页卸载后仍记住所选标签） */
-let sessionTagFilter: string[] = [];
+/** 跨导航保持的筛选状态（首页卸载后仍记住所选标签；空串表示「全部」） */
+let sessionTagFilter = '';
 
 @customElement('home-page')
 export class HomePage extends LitElement {
@@ -95,7 +95,8 @@ export class HomePage extends LitElement {
   `;
 
   @state() private events: AevumEvent[] = [];
-  @state() private filterIds: string[] = sessionTagFilter;
+  /** 单选筛选：当前选中的标签 id，空串表示未筛选（全部） */
+  @state() private filterId: string = sessionTagFilter;
 
   @query('event-detail') private detail!: EventDetail;
 
@@ -123,28 +124,26 @@ export class HomePage extends LitElement {
   }
 
   private toggleFilter(id: string) {
-    const set = new Set(this.filterIds);
-    if (set.has(id)) set.delete(id);
-    else set.add(id);
-    this.filterIds = [...set];
-    sessionTagFilter = this.filterIds;
+    // 单选：再次点击同一项则取消，否则切换为该项
+    this.filterId = this.filterId === id ? '' : id;
+    sessionTagFilter = this.filterId;
   }
 
   private clearFilter() {
-    this.filterIds = [];
-    sessionTagFilter = [];
+    this.filterId = '';
+    sessionTagFilter = '';
   }
 
   render() {
     const all = sortedEvents(this.events);
-    // 丢弃已被删除的标签 id，避免筛选后列表意外为空
-    const validFilter = this.filterIds.filter((id) => getTags().some((tg) => tg.id === id));
+    // 单选筛选：仅保留仍存在于标签库的 id，避免已删标签导致列表意外为空
+    const activeFilter = getTags().some((tg) => tg.id === this.filterId) ? this.filterId : '';
     const visible =
-      validFilter.length === 0
+      activeFilter === ''
         ? all
-        : all.filter((e) => e.tags.some((id) => validFilter.includes(id)));
+        : all.filter((e) => e.tags.includes(activeFilter));
     const hasTags = getTags().length > 0;
-    const filtering = validFilter.length > 0;
+    const filtering = activeFilter !== '';
 
     return html`
       ${hasTags
@@ -152,7 +151,7 @@ export class HomePage extends LitElement {
             <button class="fchip ${filtering ? '' : 'on'}" @click=${this.clearFilter}>${t('filterAll')}</button>
             ${getTags().map(
               (tg) => html`<button
-                class="fchip ${validFilter.includes(tg.id) ? 'on' : ''}"
+                class="fchip ${activeFilter === tg.id ? 'on' : ''}"
                 style="--chip-color: ${tg.color}"
                 @click=${() => this.toggleFilter(tg.id)}
               >${tagDisplay(tg)}</button>`
