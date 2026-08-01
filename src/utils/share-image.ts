@@ -28,6 +28,8 @@ export interface ShareImageOptions {
   dark: boolean;
   /** 卡片覆盖：不透明 / 半透明 / 高斯模糊 */
   cardStyle: CardStyle;
+  /** 卡片覆盖强度 0..1：半透明时控制不透明度、高斯模糊时控制模糊半径与覆盖浓度（opaque 时忽略） */
+  cardIntensity: number;
   /** 是否压暗背景图（默认 false：保留背景图原色，靠卡片覆盖保证可读） */
   darkenBg: boolean;
 }
@@ -143,6 +145,7 @@ function normalizeOptions(opts?: Partial<ShareImageOptions>): ShareImageOptions 
     themeColor: opts?.themeColor ?? s.seedColor,
     dark,
     cardStyle: opts?.cardStyle ?? 'opaque',
+    cardIntensity: opts?.cardIntensity ?? 0.5,
     darkenBg: opts?.darkenBg ?? false,
   };
 }
@@ -190,20 +193,26 @@ export async function drawShareImage(
   const cardW = W - PAD * 2;
   const cardH = H - PAD * 2 - 40;
 
+  // 覆盖强度：半透明控制不透明度、高斯模糊控制模糊半径与覆盖浓度（opaque 忽略）
+  const intensity = Math.max(0, Math.min(1, options.cardIntensity));
+  const blurRadius = 4 + intensity * 76;
+  const cardAlpha =
+    options.cardStyle === 'opaque'
+      ? 1
+      : options.cardStyle === 'translucent'
+        ? 0.08 + intensity * 0.92
+        : 0.15 + intensity * 0.65;
+
   // 高斯模糊：在卡片裁剪区内重绘一遍模糊后的背景图（磨砂玻璃效果）
   if (options.cardStyle === 'blur' && bgImg) {
     ctx.save();
     roundRect(ctx, cardX, cardY, cardW, cardH, 56);
     ctx.clip();
-    if (typeof ctx.filter !== 'undefined') ctx.filter = 'blur(40px)';
+    if (typeof ctx.filter !== 'undefined') ctx.filter = `blur(${blurRadius}px)`;
     drawCover(ctx, bgImg, cardX, cardY, cardW, cardH);
     if (typeof ctx.filter !== 'undefined') ctx.filter = 'none';
     ctx.restore();
   }
-
-  // 卡片填充：按覆盖样式决定不透明度
-  const cardAlpha =
-    options.cardStyle === 'opaque' ? 1 : options.cardStyle === 'translucent' ? 0.84 : 0.62;
   ctx.save();
   ctx.shadowColor = 'rgba(0,0,0,0.18)';
   ctx.shadowBlur = 48;

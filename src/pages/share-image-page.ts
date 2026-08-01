@@ -8,6 +8,7 @@ import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/button/filled-button.js';
 import '@material/web/iconbutton/icon-button.js';
+import '@material/web/slider/slider.js';
 import type { MdOutlinedSelect } from '@material/web/select/outlined-select.js';
 import type { AevumEvent } from '../types.js';
 import { getEvents, getEvent, onEventsChange, sortedEvents } from '../store/events.js';
@@ -65,6 +66,15 @@ export class ShareImagePage extends LitElement {
     .control md-outlined-select {
       width: 100%;
       max-width: 260px;
+    }
+    .control md-slider {
+      width: 100%;
+      max-width: 280px;
+    }
+    .intensity-label {
+      font-size: 0.9rem;
+      color: var(--md-sys-color-on-surface-variant);
+      flex: none;
     }
     .color-row {
       display: flex;
@@ -210,6 +220,7 @@ export class ShareImagePage extends LitElement {
   @state() private seedColor = getSettings().seedColor;
   @state() private dark = resolveDark(getSettings().themeMode);
   @state() private cardStyle: CardStyle = 'opaque';
+  @state() private cardIntensity = 0.5;
   @state() private saving = false;
 
   @query('#preview') private previewCanvas!: HTMLCanvasElement;
@@ -241,7 +252,8 @@ export class ShareImagePage extends LitElement {
       changed.has('eventId') ||
       changed.has('seedColor') ||
       changed.has('dark') ||
-      changed.has('cardStyle')
+      changed.has('cardStyle') ||
+      changed.has('cardIntensity')
     ) {
       this.renderPreview();
     }
@@ -252,6 +264,7 @@ export class ShareImagePage extends LitElement {
       themeColor: this.seedColor,
       dark: this.dark,
       cardStyle: this.cardStyle,
+      cardIntensity: this.cardIntensity,
       darkenBg: false,
     };
   }
@@ -277,6 +290,11 @@ export class ShareImagePage extends LitElement {
 
   private onCardStyleChange(e: Event) {
     this.cardStyle = (e.target as MdOutlinedSelect).value as CardStyle;
+  }
+
+  private onIntensityChange(e: Event) {
+    const el = e.target as HTMLElement & { value: number };
+    this.cardIntensity = Math.max(0, Math.min(1, Number(el.value) / 100));
   }
 
   private onColorChange(e: CustomEvent<{ value: string }>) {
@@ -396,6 +414,24 @@ export class ShareImagePage extends LitElement {
                     </md-outlined-select>
                   </div>
                 </div>
+
+                ${this.cardStyle !== 'opaque'
+                  ? html`<div class="item">
+                      <div class="intensity-label">
+                        ${this.cardStyle === 'blur' ? t('shareImageBlurAmount') : t('shareImageOpacity')}
+                      </div>
+                      <div class="control">
+                        <md-slider
+                          min="0"
+                          max="100"
+                          step="1"
+                          .value=${Math.round(this.cardIntensity * 100)}
+                          @input=${this.onIntensityChange}
+                          aria-label=${this.cardStyle === 'blur' ? t('shareImageBlurAmount') : t('shareImageOpacity')}
+                        ></md-slider>
+                      </div>
+                    </div>`
+                  : ''}
               </div>
             </div>
 

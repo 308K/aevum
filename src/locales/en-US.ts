@@ -163,6 +163,8 @@ export const enUS: LocaleDict = {
   shareImageCardOpaque: 'Opaque',
   shareImageCardTranslucent: 'Translucent',
   shareImageCardBlur: 'Blur',
+  shareImageOpacity: 'Opacity',
+  shareImageBlurAmount: 'Blur amount',
   shareImageSectionPreview: 'Preview',
   shareImagePreview: 'Image preview',
   shareImageSelectEventHint: 'Select an event',
