@@ -13,16 +13,7 @@ import '@material/web/textfield/outlined-text-field.js';
 import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/switch/switch.js';
-import {
-  CALENDAR_IDS,
-  yearOptions,
-  monthOptions,
-  dayOptions,
-  keysFromGregorian,
-  gregorianFromKeys,
-  formatEventDate,
-  type CalOption,
-} from '../utils/calendar.js';
+import { CALENDAR_IDS } from '../utils/calendar.js';
 import type { CalendarId, Granularity, Recurrence } from '../types.js';
 import { addEvent, getEvent, updateEvent } from '../store/events.js';
 import { getSettings } from '../store/settings.js';
@@ -31,6 +22,7 @@ import { getLocale, onLocaleChange, t } from '../i18n.js';
 import { fileToDownscaledDataURL } from '../utils/image-file.js';
 import { icon } from '../icons.js';
 import { toast } from '../components/app-snackbar.js';
+import '../components/date-calendar.js';
 
 /** 新建标签使用的默认颜色（可在设置页改色） */
 const NEW_TAG_COLOR = '#5B5791';
@@ -76,22 +68,9 @@ export class EditPage extends LitElement {
       flex-direction: column;
       gap: 20px;
     }
-    .row {
-      display: grid;
-      grid-template-columns: 1.15fr 1fr 1fr;
-      gap: 10px;
-    }
-    .row > * {
-      min-width: 0;
-    }
     md-outlined-text-field,
     md-outlined-select {
       width: 100%;
-    }
-    @media (max-width: 480px) {
-      .row {
-        gap: 8px;
-      }
     }
     .switch-row {
       display: flex;
@@ -303,23 +282,6 @@ export class EditPage extends LitElement {
 
   /* ---------- 历法日期选择联动 ---------- */
 
-  private get selection() {
-    return keysFromGregorian(this.gregDate, this.calendar);
-  }
-
-  private get years(): CalOption[] {
-    return yearOptions(this.calendar, this.gregDate, getLocale());
-  }
-
-  private get months(): CalOption[] {
-    return monthOptions(this.calendar, this.selection.yearKey, getLocale());
-  }
-
-  private get days(): CalOption[] {
-    const sel = this.selection;
-    return dayOptions(this.calendar, sel.yearKey, sel.monthKey, getLocale());
-  }
-
   private onCalendarChange(value: string) {
     this.calendar = value as CalendarId;
     // 新建事件：切换历法时把目标日期同步为「今日」（按新历法视角），不再沿用旧历法的日期
@@ -327,18 +289,12 @@ export class EditPage extends LitElement {
     this.requestUpdate();
   }
 
-  private onDatePartChange(part: 'yearKey' | 'monthKey' | 'dayKey', value: string) {
-    const sel = { ...this.selection, [part]: value };
-    // 月份变化可能导致日无效 → 自动收敛到该月最后有效日
-    if (part !== 'dayKey') {
-      const validDays = dayOptions(this.calendar, sel.yearKey, sel.monthKey, getLocale());
-      if (!validDays.some((o) => o.key === sel.dayKey)) {
-        sel.dayKey = validDays[validDays.length - 1]?.key ?? sel.dayKey;
-      }
+  private onDatePicked(iso: string) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
+    if (m) {
+      this.gregDate = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+      this.requestUpdate();
     }
-    const next = gregorianFromKeys(sel, this.calendar);
-    if (next) this.gregDate = next;
-    this.requestUpdate();
   }
 
   /* ---------- 标签（引用全局标签库） ---------- */
@@ -443,7 +399,6 @@ export class EditPage extends LitElement {
   }
 
   render() {
-    const sel = this.selection;
     return html`
       <form @submit=${this.onSubmit}>
         <md-outlined-text-field
@@ -470,40 +425,14 @@ export class EditPage extends LitElement {
         </md-outlined-select>
 
         <div class="section-label">${t('fieldDate')}</div>
-        <div class="row">
-          ${keyed(
-            this.calendar,
-            html`
-              <md-outlined-select
-                label=${t('fieldYear')}
-                .value=${sel.yearKey}
-                @change=${(e: Event) => this.onDatePartChange('yearKey', this.fieldValue(e))}
-              >
-                ${this.years.map(
-                  (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
-                )}
-              </md-outlined-select>
-              <md-outlined-select
-                label=${t('fieldMonth')}
-                .value=${sel.monthKey}
-                @change=${(e: Event) => this.onDatePartChange('monthKey', this.fieldValue(e))}
-              >
-                ${this.months.map(
-                  (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
-                )}
-              </md-outlined-select>
-              <md-outlined-select
-                label=${t('fieldDay')}
-                .value=${sel.dayKey}
-                @change=${(e: Event) => this.onDatePartChange('dayKey', this.fieldValue(e))}
-              >
-                ${this.days.map(
-                  (o) => html`<md-select-option value=${o.key}><div slot="headline">${o.display}</div></md-select-option>`
-                )}
-              </md-outlined-select>
-            `
-          )}
-        </div>
+        ${keyed(
+          this.calendar,
+          html`<date-calendar
+            .calendar=${this.calendar}
+            .value=${toISO(this.gregDate)}
+            @date-change=${(e: CustomEvent<string>) => this.onDatePicked(e.detail)}
+          ></date-calendar>`
+        )}
 
         <div class="switch-row">
           <div>

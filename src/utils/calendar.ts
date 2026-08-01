@@ -340,6 +340,45 @@ export function gregorianFromKeys(sel: DateSelection, cal: CalendarId): Date | n
   return null;
 }
 
+/* ---------------- 日历网格（供可视化日历控件使用） ---------------- */
+
+/** 日历网格中的一个日格：含历法显示与对应公历日期（用于周列对齐） */
+export interface CalDayCell {
+  dayKey: string;
+  dayDisplay: string;
+  /** 该历法日对应的公历本地零点 Date */
+  greg: Date;
+}
+
+/**
+ * 枚举某历法某年某月的全部日，并附上各自对应的公历日期。
+ * 用于把日格摆进 7 列周网格：连续历法日 ⟷ 连续公历日，故 weekday 逐日 +1，
+ * 用 greg.getDay() 即可正确归列。纯函数、无 DOM，复用 monthOptions 的首见起点顺序扫描。
+ */
+export function monthCalendarDays(
+  cal: CalendarId,
+  yearKey: string,
+  monthKey: string,
+  displayLocale = 'zh-CN'
+): CalDayCell[] {
+  const days = dayOptions(cal, yearKey, monthKey, displayLocale);
+  if (days.length === 0) return [];
+  if (cal === 'gregory') {
+    const y = Number(yearKey);
+    const m = Number(monthKey);
+    return days.map((d, i) => ({ dayKey: d.key, dayDisplay: d.display, greg: new Date(y, m - 1, i + 1) }));
+  }
+  const months = monthOptions(cal, yearKey, displayLocale) as MonthEntry[];
+  const me = months.find((e) => e.key === monthKey);
+  if (!me) return [];
+  let g = new Date(me.firstSeen.getTime());
+  return days.map((d) => {
+    const cur = new Date(g.getTime());
+    g = new Date(g.getTime() + DAY_MS);
+    return { dayKey: d.key, dayDisplay: d.display, greg: cur };
+  });
+}
+
 /* ---------------- 展示格式化 ---------------- */
 
 /**
@@ -362,6 +401,14 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
     // 强制 era:long，保证中文下显示年号（令和/平成…）而非缩写字母
     return fmt(displayLocale, 'japanese', { year: 'numeric', month: 'long', day: 'numeric', era: 'long' }).format(date);
   }
+  if (cal === 'hebrew' && displayLocale.startsWith('zh')) {
+    // 中文下用民用月序（与 ICU 一致：Tishri=1 … Elul=13 闰年），闰年末月即「13月」
+    const k = keysFromGregorian(date, 'hebrew');
+    const era = eraName('hebrew', displayLocale);
+    const yearNum = k.yearKey.split('|')[1] ?? '';
+    const m = hebrewMonthNum(k.monthKey, k.yearKey);
+    return `${era}${yearNum}年${Number.isNaN(m) ? k.monthKey : m}月${k.dayKey}日`;
+  }
   // 其他历法：用原生 Intl 完整格式化（保留“月/日”单位、标点与正确顺序），
   // 仅把 era 字段替换为权威映射值。好处：在完整 ICU 的平台上映射值与原值一致
   //（等于无操作），在 Android Chrome 裁减 ICU 下则替换掉错误的 era（如“BC”），
@@ -375,4 +422,77 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
 export function formatEventDateTime(dateISO: string, time: string | undefined, cal: CalendarId, displayLocale: string): string {
   const base = formatEventDate(dateISO, cal, displayLocale);
   return time ? `${base} ${time}` : base;
+}
+
+/**
+ * 希伯来历某年某月的「民用序号」（与 ICU 一致，提斯利月/Tishri 为每年第 1 个月），
+ * 从「该年月份枚举顺序」取 1-based 序号：闰年 Tishri=1 … 闰亚达(Adar I)=6、
+ * 正常亚达(Adar II)=7 … Elul=13；平年同理但末月 Elul=12。用枚举顺序而非静态表，
+ * 才能同时正确处理平/闰年（同一月名在不同年型序号不同）。键无法识别时回退 NaN。
+ */
+function hebrewMonthNum(monthKey: string, yearKey: string): number {
+  const months = monthOptions('hebrew', yearKey, 'zh-CN') as MonthEntry[];
+  const idx = months.findIndex((m) => m.key === monthKey);
+  return idx < 0 ? NaN : idx + 1;
+}
+
+/**
+ * 日历控件表头的「年-月」标签（仅年至月，不含日）。
+ *
+ * 中文统一为「{年}年{月}月」风格：年份带纪元/年号并以「年」结尾，月份用数字加「月」，
+ * 年与月之间、纪元与年号之间均无多余空格。示例：
+ * - 公历：       2026年8月
+ * - 伊斯兰历：   伊斯兰历1448年2月
+ * - 日本和历：   令和8年8月
+ * - 农历（沿用既有风格）：2026年·丙午年 正月
+ *
+ * 非中文回退到 Intl 标准「月 年（纪元缩写）」格式。
+ * 纯函数、无 DOM，键均 locale 无关（yearKey/monthKey 由 keysFromGregorian 产出）。
+ */
+export function formatYearMonthHeader(
+  cal: CalendarId,
+  yearKey: string,
+  monthKey: string,
+  displayLocale = 'zh-CN'
+): string {
+  if (!displayLocale.startsWith('zh')) {
+    const months = monthOptions(cal, yearKey, displayLocale) as MonthEntry[];
+    const me = months.find((e) => e.key === monthKey);
+    if (!me) return '';
+    return fmt(displayLocale, cal, { year: 'numeric', month: 'long', era: 'short' }).format(me.firstSeen);
+  }
+
+  if (cal === 'chinese') {
+    // 农历：沿用既有正确的「年（公元·干支） 月（汉字名）」风格
+    const ye = yearOptions('chinese', new Date(), 'zh-CN').find((e) => e.key === yearKey);
+    const me = monthOptions('chinese', yearKey, 'zh-CN').find((e) => e.key === monthKey);
+    return `${ye?.display ?? ''} ${me?.display ?? ''}`.trim();
+  }
+
+  if (cal === 'gregory') {
+    return `${yearKey}年${monthKey}月`;
+  }
+
+  if (cal === 'hebrew') {
+    // 中文下用民用月序（与 ICU 一致：Tishri=1 … Elul=13 闰年），闰年末月即「13月」
+    const era = eraName('hebrew', 'zh-CN');
+    const yearNum = yearKey.split('|')[1] ?? '';
+    const m = hebrewMonthNum(monthKey, yearKey);
+    return `${era}${yearNum}年${Number.isNaN(m) ? monthKey : m}月`;
+  }
+
+  // 非公历：月份用「该年月份枚举顺序」的数字序号（1-based）。
+  // 注意：希伯来历在部分 ICU 下 month:'numeric' 会退化成英文月名（如 “Av”），
+  // 不能直接当数字月用；故统一取枚举序数，确保中文表头为「X月」而非「Av月」。
+  const monthNum = (monthOptions(cal, yearKey, 'zh-CN') as MonthEntry[]).findIndex((m) => m.key === monthKey) + 1;
+
+  if (cal === 'japanese') {
+    const [era, yr] = yearKey.split('|');
+    return `${era ?? ''}${yr ?? ''}年${monthNum}月`;
+  }
+
+  // 伊斯兰历 / 希伯来历 / 波斯历 / 佛教历：纪元 + 年 + 月（均数字）
+  const era = eraName(cal, 'zh-CN');
+  const yearNum = yearKey.split('|')[1] ?? '';
+  return `${era}${yearNum}年${monthNum}月`;
 }

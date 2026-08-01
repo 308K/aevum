@@ -1,11 +1,13 @@
 /* Aevum 核心逻辑冒烟测试（纯 Intl / 时间引擎，无 DOM） */
 import {
   formatEventDate,
+  formatYearMonthHeader,
   keysFromGregorian,
   gregorianFromKeys,
   yearOptions,
   monthOptions,
   dayOptions,
+  monthCalendarDays,
   type CalendarId,
 } from 'D:/dev/aevum/src/utils/calendar.js';
 import { computeDiff, logicalDaySerial, parseBoundary, nextOccurrenceDate, effectiveEvent } from 'D:/dev/aevum/src/utils/time-calc.js';
@@ -34,6 +36,9 @@ check('islamic 英文纪元', formatEventDate('2026-07-31', 'islamic', 'en-US').
 check('hebrew 中文纪元', formatEventDate('2026-07-31', 'hebrew', 'zh-CN').startsWith('希伯来历'), true);
 check('persian 中文纪元', formatEventDate('2026-07-31', 'persian', 'zh-CN').startsWith('波斯历'), true);
 check('buddhist 中文纪元', formatEventDate('2026-07-31', 'buddhist', 'zh-CN').startsWith('佛历'), true);
+// 希伯来历正文：与表头一致，采用民用月序（Tishri=1 … Elul=13 闰年）
+check('hebrew 闰年闰亚达月', formatEventDate('2027-02-10', 'hebrew', 'zh-CN'), '希伯来历5787年6月3日');
+check('hebrew 闰年亚达月', formatEventDate('2027-03-10', 'hebrew', 'zh-CN'), '希伯来历5787年7月1日');
 // 年份键稳定且 locale 无关：历法id|年（不受 Android era bug 影响）
 check('islamic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic').yearKey, 'islamic|1448');
 
@@ -156,6 +161,53 @@ check('缺失 id 解析为空', tagsMod.resolveEventTags(baseEvent(['nope'])).le
 const preset = tagsMod.getTags().find((tg: { id: string }) => tg.id === 'preset_tagLife');
 check('预设标签存在', Boolean(preset), true);
 check('预设标签显示名=生活', preset ? tagsMod.tagDisplay(preset) : '', '生活');
+
+console.log('== 8. 日历网格 monthCalendarDays ==');
+// 公历 2024-02：29 天，首日 2024-02-01 周四（getDay()=4），末日 2024-02-29
+const feb24 = monthCalendarDays('gregory', '2024', '2', 'zh-CN');
+check('公历 2024-02 网格 29 格', feb24.length, 29);
+check('公历 2024-02 首日公历对齐', `${feb24[0].greg.getFullYear()}-${feb24[0].greg.getMonth()}-${feb24[0].greg.getDate()}`, '2024-1-1');
+check('公历 2024-02 首日星期', feb24[0].greg.getDay(), 4);
+// 网格 dayKey 与 dayOptions 一致（升序 1..29）
+check('公历网格 dayKey 升序', feb24.map((c) => c.dayKey).join(','), Array.from({ length: 29 }, (_, i) => String(i + 1)).join(','));
+// 农历丙午正月：网格日数与 dayOptions 完全一致
+const lunarSel = keysFromGregorian(new Date(2026, 1, 17), 'chinese');
+const lunarGrid = monthCalendarDays('chinese', lunarSel.yearKey, lunarSel.monthKey, 'zh-CN');
+const lunarDays = dayOptions('chinese', lunarSel.yearKey, lunarSel.monthKey, 'zh-CN');
+check('农历网格与日选项数量一致', lunarGrid.length, lunarDays.length);
+check('农历网格首日显示初一', lunarGrid[0]?.dayDisplay, '初一');
+// 网格公历日期与 gregorianFromKeys 回填一致
+const gridGreg = lunarGrid.find((c) => c.dayKey === lunarSel.dayKey);
+const backGreg = gregorianFromKeys({ yearKey: lunarSel.yearKey, monthKey: lunarSel.monthKey, dayKey: lunarSel.dayKey }, 'chinese');
+check('农历网格公历=往返公历', gridGreg ? `${gridGreg.greg.getFullYear()}-${gridGreg.greg.getMonth()}-${gridGreg.greg.getDate()}` : null,
+  backGreg ? `${backGreg.getFullYear()}-${backGreg.getMonth()}-${backGreg.getDate()}` : null);
+
+console.log('== 8.5 日历表头年月格式化（中文）==');
+// 公历 2026 年 8 月
+check('公历表头', formatYearMonthHeader('gregory', '2026', '8', 'zh-CN'), '2026年8月');
+// 伊斯兰历 1448 年 2 月
+check('伊斯兰历表头', formatYearMonthHeader('islamic', 'islamic|1448', '2', 'zh-CN'), '伊斯兰历1448年2月');
+// 希伯来历：中文表头用民用月序（与 ICU 一致：Tishri=1 … Elul=13 闰年 / 12 平年）
+check('希伯来 闰年 Tishri=1月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Tishri', 'zh-CN'), '希伯来历5787年1月');
+check('希伯来 闰年 Adar I=6月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar I', 'zh-CN'), '希伯来历5787年6月');
+check('希伯来 闰年 Adar II=7月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar II', 'zh-CN'), '希伯来历5787年7月');
+check('希伯来 闰年 末月Elul=13月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Elul', 'zh-CN'), '希伯来历5787年13月');
+check('希伯来 平年 Adar=6月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'Adar', 'zh-CN'), '希伯来历5786年6月');
+check('希伯来 平年 末月Elul=12月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'Elul', 'zh-CN'), '希伯来历5786年12月');
+const hbCiv = ['Tishri', 'Heshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar I', 'Adar II', 'Nisan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul']
+  .map((mk) => formatYearMonthHeader('hebrew', 'hebrew|5787', mk, 'zh-CN'));
+check('希伯来 闰年民用序连续1-13', hbCiv.every((h, i) => h.endsWith(`${i + 1}月`)), true);
+// 波斯历 1405 年 5 月
+check('波斯历表头', formatYearMonthHeader('persian', 'persian|1405', '5', 'zh-CN').startsWith('波斯历1405年'), true);
+// 佛教历 2569 年 8 月
+check('佛教历表头', formatYearMonthHeader('buddhist', 'buddhist|2569', '8', 'zh-CN').startsWith('佛历2569年'), true);
+// 日本和历 令和 8 年 8 月
+check('日本和历表头', formatYearMonthHeader('japanese', '令和|8', '8', 'zh-CN'), '令和8年8月');
+// 农历沿用既有风格（含公元·干支与汉字月名）
+const cnHeader = formatYearMonthHeader('chinese', '2026|丙午', '正月', 'zh-CN');
+check('农历表头含干支与月名', cnHeader.includes('丙午') && cnHeader.includes('正月'), true);
+// 英文回退到 Intl 标准「月 年」格式（不含多余数字月）
+check('英文表头含 August', formatYearMonthHeader('gregory', '2026', '8', 'en-US').includes('August'), true);
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);
