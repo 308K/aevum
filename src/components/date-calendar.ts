@@ -169,10 +169,17 @@ export class DateCalendar extends LitElement {
       margin-top: 10px;
     }
     .hint {
-      margin: 8px 2px 0;
-      font-size: 0.72rem;
-      line-height: 1.45;
-      color: var(--md-sys-color-on-surface-variant);
+      /* 仅供屏幕阅读器：视觉隐藏，但读屏在网格获焦时会念出 */
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      margin: -1px;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
     }
     .today-btn {
       padding: 6px 18px;
