@@ -16,8 +16,9 @@ import {
   formatYearMonthHeader,
   type CalDayCell,
 } from '../utils/calendar.js';
-import type { CalendarId } from '../types.js';
+import type { CalendarId, WeekStart } from '../types.js';
 import { getLocale, t } from '../i18n.js';
+import { getSettings, onSettingsChange } from '../store/settings.js';
 import { icon } from '../icons.js';
 
 const GRID_ID = 'aevum-cal-grid';
@@ -35,8 +36,17 @@ function fromISO(iso: string): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
-/** 取某 locale 的每周首日列索引（0=周日 … 6=周六），优先用 Intl weekInfo，回退按语言惯例 */
-function firstDayOfWeek(locale: string): number {
+/** 取某 locale 的每周首日列索引（0=周日 … 6=周六）
+ *  优先用 Intl weekInfo；override 为固定选择（'sunday'/'monday'/'saturday'）时直接采用；
+ *  override 为 'locale' 或省略时回退到语言惯例。 */
+function firstDayOfWeek(locale: string, override?: WeekStart): number {
+  if (override && override !== 'locale') {
+    switch (override) {
+      case 'sunday': return 0;
+      case 'monday': return 1;
+      case 'saturday': return 6;
+    }
+  }
   try {
     const li = new Intl.Locale(locale) as Intl.Locale & {
       getWeekInfo?: () => { firstDay: number };
@@ -243,6 +253,24 @@ export class DateCalendar extends LitElement {
     return getLocale();
   }
 
+  /** 当前生效的每周首日列索引：跟随设置（默认按 locale 习惯） */
+  private get resolvedFirstDOW(): number {
+    return firstDayOfWeek(this.locale, getSettings().weekStart);
+  }
+
+  private unsubSettings?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    // 设置变更（如周起始日）即时反映到日历
+    this.unsubSettings = onSettingsChange(() => this.requestUpdate());
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.unsubSettings?.();
+  }
+
   /** 作为 yearOptions 采样中心的参考公历日期（取当前选中值，确保视图年份落在 ±100 年内） */
   private get refDate(): Date {
     return fromISO(this.value) ?? new Date();
@@ -394,7 +422,7 @@ export class DateCalendar extends LitElement {
   render() {
     const locale = this.locale;
     const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, locale);
-    const firstDOW = firstDayOfWeek(locale);
+    const firstDOW = this.resolvedFirstDOW;
 
     // 周列标题：以 2023-01-01（周日）为基准，按首日偏移归列；同时取窄/全称供可见与读屏使用
     const wdNarrow = new Intl.DateTimeFormat(locale, { weekday: 'narrow' });

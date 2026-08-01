@@ -24,6 +24,7 @@ import type {
   Granularity,
   LocalePref,
   ThemeMode,
+  WeekStart,
 } from '../types.js';
 import { getSettings, onSettingsChange, updateSettings, PRESET_SEED_COLORS } from '../store/settings.js';
 import {
@@ -57,6 +58,13 @@ const GRAN_I18N_KEYS: Record<Granularity, 'granDay' | 'granDhms' | 'granYmd' | '
   ymd: 'granYmd',
   ywd: 'granYwd',
   wd: 'granWd',
+};
+
+const WEEKSTART_I18N_KEYS: Record<WeekStart, 'weekStartLocale' | 'weekStartSunday' | 'weekStartMonday' | 'weekStartSaturday'> = {
+  locale: 'weekStartLocale',
+  sunday: 'weekStartSunday',
+  monday: 'weekStartMonday',
+  saturday: 'weekStartSaturday',
 };
 
 @customElement('settings-page')
@@ -610,6 +618,24 @@ export class SettingsPage extends LitElement {
                 ${(['day', 'dhms', 'ymd', 'ywd', 'wd'] as Granularity[]).map(
                   (g) => html`<md-select-option value=${g}>
                     <div slot="headline">${t(GRAN_I18N_KEYS[g])}</div>
+                  </md-select-option>`
+                )}
+              </md-outlined-select>
+            </div>
+          </div>
+          <div class="item">
+            <div>
+              <div class="label">${t('settingsWeekStart')}</div>
+              <div class="hint">${t('settingsWeekStartHint')}</div>
+            </div>
+            <div class="control">
+              <md-outlined-select
+                .value=${s.weekStart}
+                @change=${(e: Event) => this.set('weekStart', (e.target as MdOutlinedSelect).value as WeekStart)}
+              >
+                ${(['locale', 'sunday', 'monday', 'saturday'] as WeekStart[]).map(
+                  (w) => html`<md-select-option value=${w}>
+                    <div slot="headline">${t(WEEKSTART_I18N_KEYS[w])}</div>
                   </md-select-option>`
                 )}
               </md-outlined-select>

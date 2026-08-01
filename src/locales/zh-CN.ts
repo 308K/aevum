@@ -131,6 +131,12 @@ export const zhCN = {
   settingsDayBoundaryHint: '自定义一天的起始时刻，影响仅设置日期事件的天数计算',
   settingsDefaultCalendar: '默认历法',
   settingsDefaultGranularity: '默认展示粒度',
+  settingsWeekStart: '周起始日',
+  settingsWeekStartHint: '日历（目标日期选择器）每周第一列从哪天开始；默认跟随语言/地区习惯',
+  weekStartLocale: '跟随语言/地区',
+  weekStartSunday: '周日',
+  weekStartMonday: '周一',
+  weekStartSaturday: '周六',
 
   // 数据与背景
   settingsSectionData: '数据',

@@ -122,6 +122,12 @@ export const enUS: LocaleDict = {
   settingsDayBoundaryHint: 'Custom start of a day; affects day counting of date-only events',
   settingsDefaultCalendar: 'Default calendar',
   settingsDefaultGranularity: 'Default granularity',
+  settingsWeekStart: 'Week starts on',
+  settingsWeekStartHint: 'The first column of the calendar (target-date picker); defaults to the language/region convention',
+  weekStartLocale: 'Auto (by locale)',
+  weekStartSunday: 'Sunday',
+  weekStartMonday: 'Monday',
+  weekStartSaturday: 'Saturday',
 
   // Data & background
   settingsSectionData: 'Data',

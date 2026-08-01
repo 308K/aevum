@@ -74,6 +74,9 @@ export interface CustomTheme {
 /** 语言偏好 */
 export type LocalePref = 'system' | 'zh-CN' | 'en-US';
 
+/** 日历周起始日（目标日期选择器）；'locale' 表示跟随语言/地区习惯 */
+export type WeekStart = 'locale' | 'sunday' | 'monday' | 'saturday';
+
 /** 全局设置 */
 export interface AevumSettings {
   locale: LocalePref;
@@ -88,6 +91,8 @@ export interface AevumSettings {
   dayBoundary: string;
   defaultCalendar: CalendarId;
   defaultGranularity: Granularity;
+  /** 日历周起始日（目标日期选择器）；'locale' 表示跟随语言/地区习惯 */
+  weekStart: WeekStart;
 }
 
 export const DEFAULT_SETTINGS: AevumSettings = {
@@ -99,6 +104,7 @@ export const DEFAULT_SETTINGS: AevumSettings = {
   dayBoundary: '00:00',
   defaultCalendar: 'gregory',
   defaultGranularity: 'day',
+  weekStart: 'locale',
 };
 
 /** 预设标签（颜色区分） */
