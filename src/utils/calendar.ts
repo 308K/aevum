@@ -29,7 +29,18 @@ export interface CalOption {
   display: string;
 }
 
-const DAY_MS = 86_400_000;
+/**
+ * 公历日历日递进 / 回退：用「年/月/日」分量重新构造 Date，
+ * 而非对时间戳加/减 86400000ms。后者在夏令时回拨月（如美国 11 月，当天有 25 小时）
+ * 会出现「+24h 仍落在同一公历日」的错位，导致历法扫描与网格 weekday 对齐错误。
+ * 分量构造法在任意时区（含 DST）都精确等价于「日历日 ±n」，是日历日步进的正确做法。
+ */
+function addDays(d: Date, n = 1): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+}
+function subDays(d: Date, n = 1): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate() - n);
+}
 
 /** 农历日汉字名（1–30）：初一…初十、十一…二十、廿一…廿九、三十 */
 const LUNAR_DAY_NAMES = [
@@ -236,14 +247,14 @@ function findYearStart(cal: CalendarId, entry: YearEntry, displayLocale: string)
   let d = new Date(entry.firstSeen.getTime());
   // 回退到上一年的边界（采样间隔最长约 92 天，留足余量）
   for (let i = 0; i < 130; i++) {
-    const prev = new Date(d.getTime() - DAY_MS);
+    const prev = subDays(d);
     if (keyPartsOf(prev, cal, displayLocale).yearKey !== entry.key) break;
     d = prev;
   }
   // 正向扫描直到进入目标年
   for (let i = 0; i < 400; i++) {
     if (keyPartsOf(d, cal, displayLocale).yearKey === entry.key) return d;
-    d = new Date(d.getTime() + DAY_MS);
+    d = addDays(d);
   }
   return d;
 }
@@ -275,7 +286,7 @@ export function monthOptions(cal: CalendarId, yearKey: string, displayLocale = '
         seen.add(k.monthKey);
         entries.push({ key: k.monthKey, display: k.monthDisplay, firstSeen: new Date(d.getTime()) });
       }
-      d = new Date(d.getTime() + DAY_MS);
+      d = addDays(d);
     }
   }
   monthCache.set(cacheKey, entries);
@@ -308,7 +319,7 @@ export function dayOptions(
       const k = keyPartsOf(d, cal, displayLocale);
       if (k.yearKey !== yearKey || k.monthKey !== monthKey) break;
       entries.push({ key: k.dayKey, display: k.dayDisplay });
-      d = new Date(d.getTime() + DAY_MS);
+      d = addDays(d);
     }
   }
   dayCache.set(cacheKey, entries);
@@ -335,7 +346,7 @@ export function gregorianFromKeys(sel: DateSelection, cal: CalendarId): Date | n
     const k = keyPartsOf(d, cal, 'zh-CN');
     if (k.yearKey !== sel.yearKey || k.monthKey !== sel.monthKey) break;
     if (k.dayKey === sel.dayKey) return d;
-    d = new Date(d.getTime() + DAY_MS);
+    d = addDays(d);
   }
   return null;
 }
@@ -373,8 +384,8 @@ export function monthCalendarDays(
   if (!me) return [];
   let g = new Date(me.firstSeen.getTime());
   return days.map((d) => {
-    const cur = new Date(g.getTime());
-    g = new Date(g.getTime() + DAY_MS);
+    const cur = new Date(g.getFullYear(), g.getMonth(), g.getDate());
+    g = addDays(g);
     return { dayKey: d.key, dayDisplay: d.display, greg: cur };
   });
 }
