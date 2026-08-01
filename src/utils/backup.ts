@@ -3,7 +3,7 @@
  * - 导出：全部事件（含事件级背景图）+ 设置为 JSON 文件下载
  * - 导入：严格校验并逐条清洗，覆盖当前事件；设置仅合并已知键
  */
-import type { AevumEvent, AevumSettings, CalendarId, Granularity } from '../types.js';
+import type { AevumEvent, AevumSettings, CalendarId, Granularity, Recurrence } from '../types.js';
 import { DEFAULT_SETTINGS } from '../types.js';
 import { getEvents, replaceAllEvents } from '../store/events.js';
 import { getTags, replaceTags, normalizeEventTags } from '../store/tags.js';
@@ -11,6 +11,7 @@ import { getSettings, updateSettings } from '../store/settings.js';
 import { CALENDAR_IDS } from './calendar.js';
 
 const GRANULARITIES: Granularity[] = ['day', 'dhms', 'ymd', 'ywd', 'wd'];
+const RECURRENCES: Recurrence[] = ['none', 'weekly', 'monthly', 'yearly'];
 
 /** 触发浏览器下载 */
 export function downloadBlob(blob: Blob, filename: string): void {
@@ -60,6 +61,10 @@ function sanitizeEvent(raw: unknown): AevumEvent | null {
   const granularity = GRANULARITIES.includes(r.granularity as Granularity)
     ? (r.granularity as Granularity)
     : 'day';
+  // 循环规则：缺省 / 非法值一律视为不循环（兼容无 recurrence 字段的旧备份）
+  const recurrence = RECURRENCES.includes(r.recurrence as Recurrence)
+    ? (r.recurrence as Recurrence)
+    : 'none';
   const tags = normalizeEventTags(r.tags).slice(0, 8);
 
   const bgImage =
@@ -73,6 +78,7 @@ function sanitizeEvent(raw: unknown): AevumEvent | null {
     date,
     time,
     calendar,
+    recurrence,
     granularity,
     tags,
     pinned: Boolean(r.pinned),
@@ -86,9 +92,16 @@ function pickKnownSettings(raw: unknown): Partial<AevumSettings> {
   const r = raw as Record<string, unknown>;
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof AevumSettings)[]) {
-    if (key in r && typeof r[key] === typeof DEFAULT_SETTINGS[key]) {
-      out[key] = r[key];
+    if (!(key in r)) continue;
+    const val = r[key];
+    const def = DEFAULT_SETTINGS[key];
+    // 数组型设置（customThemes）单独判定：typeof 无法区分 array / null / object
+    if (Array.isArray(def)) {
+      if (Array.isArray(val)) out[key] = val;
+      continue;
     }
+    if (val === null || typeof val !== typeof def) continue;
+    out[key] = val;
   }
   return out as Partial<AevumSettings>;
 }
@@ -115,10 +128,14 @@ export async function importBackup(file: File): Promise<number> {
   // id 去重（后来的覆盖先来的）
   const dedup = new Map(events.map((e) => [e.id, e]));
 
+  const root =
+    !Array.isArray(parsed) && parsed && typeof parsed === 'object'
+      ? (parsed as Record<string, unknown>)
+      : undefined;
+
   // 若备份包含标签库，先整体替换，使导入事件引用的标签 id 有效
-  const rawTags = !Array.isArray(parsed) && parsed && typeof parsed === 'object'
-    ? (parsed as Record<string, unknown>).tags
-    : undefined;
+  // 旧备份无标签库时保留现有标签库，事件里失效的 id 由 resolveEventTags 展示时丢弃
+  const rawTags = root?.tags;
   if (Array.isArray(rawTags)) {
     const valid = rawTags
       .filter((x): x is { id: string; label: string; color: string; preset?: boolean } => {
@@ -136,16 +153,12 @@ export async function importBackup(file: File): Promise<number> {
         ...(o.preset ? { preset: true } : {}),
       }));
     replaceTags(valid);
-  } else {
-    // 旧备份无标签库：清理事件里可能指向已删除标签的无效 id
-    replaceAllEvents([...dedup.values()]);
-    return dedup.size;
   }
 
   replaceAllEvents([...dedup.values()]);
 
-  if (!Array.isArray(parsed) && parsed && typeof parsed === 'object') {
-    const settingsPatch = pickKnownSettings((parsed as Record<string, unknown>).settings);
+  if (root) {
+    const settingsPatch = pickKnownSettings(root.settings);
     if (Object.keys(settingsPatch).length > 0) updateSettings(settingsPatch);
   }
   return dedup.size;
