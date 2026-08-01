@@ -10,6 +10,7 @@ import {
   themeFromSourceColor,
 } from '@material/material-color-utilities';
 import type { AevumSettings, ThemeMode } from './types.js';
+import { applyAppIcon } from './utils/app-icon.js';
 
 type Listener = (dark: boolean) => void;
 
@@ -76,6 +77,9 @@ export function applyTheme(s: AevumSettings): 'light' | 'dark' {
   // 同步浏览器 UI 主题色
   const meta = document.querySelector('meta[name="theme-color"]');
   meta?.setAttribute('content', hexFromArgb(scheme.surface));
+
+  // 按当前主题色自动生成并更新应用图标（favicon / apple-touch-icon）
+  applyAppIcon(s.seedColor, dark);
 
   listeners.forEach((fn) => fn(dark));
   return dark ? 'dark' : 'light';
