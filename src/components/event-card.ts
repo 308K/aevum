@@ -51,6 +51,15 @@ export class EventCard extends LitElement {
       outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 2px;
     }
+    @media (prefers-reduced-motion: reduce) {
+      .card {
+        transition: box-shadow 0.18s ease, background 0.18s ease;
+      }
+      .card:hover,
+      .card:active {
+        transform: none;
+      }
+    }
     .card .bg,
     .card .scrim {
       position: absolute;

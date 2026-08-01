@@ -130,6 +130,11 @@ export class AevumApp extends LitElement {
         transform: none;
       }
     }
+    @media (prefers-reduced-motion: reduce) {
+      .page {
+        animation: none;
+      }
+    }
   `;
 
   @state() private route: Route = 'home';

@@ -138,6 +138,14 @@ export class SettingsPage extends LitElement {
     .swatch:hover {
       transform: scale(1.08);
     }
+    @media (prefers-reduced-motion: reduce) {
+      .swatch {
+        transition: border-color 0.15s ease;
+      }
+      .swatch:hover {
+        transform: none;
+      }
+    }
     .swatch[selected] {
       border-color: var(--md-sys-color-on-surface);
       box-shadow: 0 0 0 3px color-mix(in oklch, var(--swatch-color) 45%, transparent);

@@ -96,6 +96,14 @@ export class ColorPicker extends LitElement {
       outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 2px;
     }
+    @media (prefers-reduced-motion: reduce) {
+      .trigger {
+        transition: none;
+      }
+      .trigger:hover {
+        transform: none;
+      }
+    }
     .backdrop {
       position: fixed;
       inset: 0;
