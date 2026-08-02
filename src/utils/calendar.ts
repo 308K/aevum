@@ -6,7 +6,7 @@
  * - 展示格式化仍使用 Intl.DateTimeFormat（Temporal 的 toLocaleString 底层也是 Intl，
  *   但 polyfill 的 era 字段不完整，故展示层保留 Intl + 权威 era 映射）
  */
-import { Temporal } from './temporal.js';
+import { Temporal, getTemporalForCalendar } from './temporal.js';
 import { tIn, getLocale, type Locale } from '../i18n.js';
 import type { LocaleDict } from '../locales/zh-CN.js';
 import type { CalendarId } from '../types.js';
@@ -34,39 +34,17 @@ export interface CalOption {
 
 /**
  * 将应用层 CalendarId 映射为 Temporal 支持的日历标识符。
+ * - 'islamic' 在 Temporal 中不存在，映射为 'islamic-umalqura'（与 Intl 的 'islamic' 一致）
+ * - 其他历法标识符在 Temporal 中与 Intl 一致
  *
- * 重要：不同浏览器的原生 Temporal 对日历标识符的支持程度不同。
- * - Chrome 原生支持 'islamic-umalqura'（与 Intl 的 'islamic' 一致）
- * - Firefox 原生可能不支持 'islamic-umalqura'，需回退到 'islamic'
- * - Safari 无原生 Temporal，走 polyfill（两者都支持）
- *
- * 因此对伊斯兰历做运行时探测：依次尝试候选 ID，取第一个可用的。
- * 探测结果在模块级别缓存（首次调用后不再重复探测）。
+ * 注意：某些浏览器（如 Firefox 139-148）原生 Temporal 不支持 islamic-umalqura，
+ * 这由 getTemporalForCalendar() 在 temporal.ts 中处理——按日历 ID 粒度选择
+ * 原生或 polyfill 实现。
  */
 function temporalCalId(cal: CalendarId): string {
-  if (cal === 'islamic') {
-    const cached = _islamicCalCache;
-    if (cached) return cached;
-    // 优先 umalqura（与 Intl 行为一致），回退到通用 islamic
-    const candidates: string[] = ['islamic-umalqura', 'islamic'];
-    for (const id of candidates) {
-      try {
-        Temporal.PlainDate.from({ calendar: id, year: 1446, month: 1, day: 1 });
-        _islamicCalCache = id;
-        return id;
-      } catch {
-        /* 该 ID 不被当前运行时支持，继续尝试下一个 */
-      }
-    }
-    // 极端情况：两个都不支持，仍返回首选（调用方会 catch）
-    _islamicCalCache = 'islamic-umalqura';
-    return 'islamic-umalqura';
-  }
+  if (cal === 'islamic') return 'islamic-umalqura';
   return cal;
 }
-
-/** 缓存伊斯兰历探测结果（模块级单次写入） */
-let _islamicCalCache: string | undefined;
 
 /** 农历日汉字名（1–30） */
 const LUNAR_DAY_NAMES = [
@@ -125,9 +103,23 @@ function partsOf(f: Intl.DateTimeFormat, d: Date): Record<string, string> {
 
 /* ---------------- Temporal 辅助函数 ---------------- */
 
-/** 公历 Date → Temporal.PlainDate（本地零点） */
+/** 公历 Date → Temporal.PlainDate（本地零点），使用默认实现 */
 function toPlainDate(d: Date): Temporal.PlainDate {
   return Temporal.PlainDate.from({
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+  });
+}
+
+/**
+ * 公历 Date → Temporal.PlainDate（本地零点），使用指定日历的实现。
+ * 用于需要操作特定日历（如 islamic-umalqura）时，确保使用正确的 Temporal 实现
+ * （原生或 polyfill）。
+ */
+function toPlainDateForCal(d: Date, calId: string): Temporal.PlainDate {
+  const T = getTemporalForCalendar(calId);
+  return T.PlainDate.from({
     year: d.getFullYear(),
     month: d.getMonth() + 1,
     day: d.getDate(),
@@ -246,7 +238,8 @@ function keyPartsFromTemporal(
 
 /** 公历日期 → 历法键 */
 export function keysFromGregorian(date: Date, cal: CalendarId): DateSelection {
-  const pd = toPlainDate(date).withCalendar(temporalCalId(cal));
+  const calId = temporalCalId(cal);
+  const pd = toPlainDateForCal(date, calId).withCalendar(calId);
   const k = keyPartsFromTemporal(pd, cal, 'zh-CN');
   return { yearKey: k.yearKey, monthKey: k.monthKey, dayKey: k.dayKey };
 }
@@ -271,8 +264,8 @@ export function yearOptions(cal: CalendarId, refDate: Date, displayLocale = 'zh-
   const hit = yearCache.get(cacheKey);
   if (hit) return hit;
 
-  const center = toPlainDate(refDate);
   const calId = temporalCalId(cal);
+  const center = toPlainDateForCal(refDate, calId);
 
   if (cal === 'gregory') {
     const entries: YearEntry[] = [];
@@ -320,11 +313,12 @@ export function yearOptions(cal: CalendarId, refDate: Date, displayLocale = 'zh-
  */
 function resolveYearStart(cal: CalendarId, yearKey: string, displayLocale: string): Temporal.PlainDate | null {
   const calId = temporalCalId(cal);
+  const T = getTemporalForCalendar(calId);
 
   if (cal === 'gregory') {
     const y = Number(yearKey);
     if (!y) return null;
-    return Temporal.PlainDate.from({ calendar: calId, year: y, month: 1, day: 1 });
+    return T.PlainDate.from({ calendar: calId, year: y, month: 1, day: 1 });
   }
 
   if (cal === 'chinese') {
@@ -336,7 +330,7 @@ function resolveYearStart(cal: CalendarId, yearKey: string, displayLocale: strin
     for (let m = 1; m <= 2; m++) {
       for (let d = 1; d <= 31; d++) {
         try {
-          const greg = Temporal.PlainDate.from({ year: relatedYear, month: m, day: d });
+          const greg = T.PlainDate.from({ year: relatedYear, month: m, day: d });
           const chn = greg.withCalendar(calId);
           if (chn.month === 1 && chn.day === 1) return chn;
         } catch { /* 日期不存在 */ }
@@ -357,7 +351,7 @@ function resolveYearStart(cal: CalendarId, yearKey: string, displayLocale: strin
     for (let y = 1900; y <= 2100; y++) {
       for (let m = 1; m <= 12; m++) {
         try {
-          const greg = Temporal.PlainDate.from({ year: y, month: m, day: 1 });
+          const greg = T.PlainDate.from({ year: y, month: m, day: 1 });
           const jpParts = partsOf(jpFmt, new Date(greg.year, greg.month - 1, greg.day));
           if (jpParts.era === era && Number(jpParts.year) === yearInEra) {
             return greg.withCalendar(calId);
@@ -373,7 +367,7 @@ function resolveYearStart(cal: CalendarId, yearKey: string, displayLocale: strin
   const yearNum = Number(yearNumStr);
   if (!yearNum) return null;
   try {
-    return Temporal.PlainDate.from({ calendar: calId, year: yearNum, month: 1, day: 1 });
+    return T.PlainDate.from({ calendar: calId, year: yearNum, month: 1, day: 1 });
   } catch {
     return null;
   }
@@ -402,13 +396,14 @@ export function monthOptions(cal: CalendarId, yearKey: string, displayLocale = '
     if (!yearStart) return [];
 
     const calId = temporalCalId(cal);
+    const T = getTemporalForCalendar(calId);
     const monthsInYear = yearStart.monthsInYear;
     const seen = new Set<string>();
 
     for (let m = 1; m <= monthsInYear; m++) {
       try {
         // 直接用月份序号构造该月第1天
-        const tryDate = Temporal.PlainDate.from({
+        const tryDate = T.PlainDate.from({
           calendar: calId,
           year: yearStart.year,
           month: m,
@@ -450,13 +445,14 @@ export function dayOptions(
     const yearStart = resolveYearStart(cal, yearKey, displayLocale);
     if (!yearStart) return [];
     const calId = temporalCalId(cal);
+    const T = getTemporalForCalendar(calId);
 
     // 从 monthKey 定位该月第一天
     let monthStart: Temporal.PlainDate | null = null;
     const monthsInYear = yearStart.monthsInYear;
     for (let m = 1; m <= monthsInYear; m++) {
       try {
-        const tryDate = Temporal.PlainDate.from({
+        const tryDate = T.PlainDate.from({
           calendar: calId,
           year: yearStart.year,
           month: m,
@@ -498,11 +494,12 @@ export function gregorianFromKeys(sel: DateSelection, cal: CalendarId): Date | n
   const yearStart = resolveYearStart(cal, sel.yearKey, 'zh-CN');
   if (!yearStart) return null;
   const calId = temporalCalId(cal);
+  const T = getTemporalForCalendar(calId);
   const monthsInYear = yearStart.monthsInYear;
 
   for (let m = 1; m <= monthsInYear; m++) {
     try {
-      const monthStart = Temporal.PlainDate.from({
+      const monthStart = T.PlainDate.from({
         calendar: calId,
         year: yearStart.year,
         month: m,
@@ -558,7 +555,7 @@ export function monthCalendarDays(
   if (!yearStart) return [];
 
   // 从 firstSeen 对应的 Temporal.PlainDate 开始逐日枚举
-  let pd = toPlainDate(me.firstSeen).withCalendar(calId);
+  let pd = toPlainDateForCal(me.firstSeen, calId).withCalendar(calId);
   const cells: CalDayCell[] = [];
   for (const d of days) {
     const g = fromDate(pd);

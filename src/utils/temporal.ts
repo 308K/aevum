@@ -2,39 +2,103 @@
  * Temporal 桥接模块
  * - 支持原生 Temporal（TC39 Stage 3）的环境直接使用全局 Temporal
  * - 不支持的环境（如 Safari、Bun）自动回退到 @js-temporal/polyfill
+ * - 按日历 ID 粒度选择实现：某些浏览器原生 Temporal 禁用了特定日历
+ *   （如 Firefox 139-148 禁用了 islamic / islamic-umalqura），对这些日历
+ *   自动回退到 polyfill 实现。
  *
  * 用法：所有需要 Temporal 的模块都从此文件导入，而非直接引用全局或 polyfill。
  *   import { Temporal } from './temporal.js';
  *
  * `Temporal` 可同时用作值（如 `Temporal.PlainDate.from(...)`）和类型
  * （如函数参数 `d: Temporal.PlainDate`）。
- *
- * 实现说明：
- * - 当原生 globalThis.Temporal 存在时，优先使用原生实现（polyfill 的 chinese
- *   calendar 实现存在 bug：闰月 monthCode 处理不一致，会抛出
- *   "Unexpected leap month suffix: Mo6" 错误）。
- * - 当原生 Temporal 不存在时（Safari、Bun），polyfill 会在导入时自动挂载到
- *   globalThis，我们从 globalThis 取用即可。
- * - 类型来自 polyfill 的 namespace 导出（与原生 API 类型一致）。
  */
 
-// 导入 polyfill：确保它被打包进产物（供无原生 Temporal 的环境使用），
-// 同时获取 Temporal 命名空间的类型信息。
 import { Temporal as PolyfillTemporal } from '@js-temporal/polyfill';
 
-// 优先使用原生 globalThis.Temporal，回退到 polyfill 导出的 Temporal。
-const _globalTemporal = (globalThis as unknown as { Temporal?: typeof PolyfillTemporal }).Temporal;
-const _resolved = _globalTemporal ?? PolyfillTemporal;
+const _native = (globalThis as unknown as { Temporal?: typeof PolyfillTemporal }).Temporal;
+
+/**
+ * 判断原生 Temporal 是否支持指定的日历 ID。
+ * 通过尝试构造一个日期来探测。
+ */
+function nativeSupportsCalendar(calId: string): boolean {
+  if (!_native) return false;
+  try {
+    _native.PlainDate.from({ calendar: calId, year: 2026, month: 1, day: 1 });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * 测试 polyfill 是否支持指定的日历 ID。
+ * 首次调用时执行，结果缓存。
+ */
+let _polyfillTested = false;
+let _polyfillSupportsIslamic = false;
+
+function polyfillSupportsCalendar(calId: string): boolean {
+  if (calId !== 'islamic-umalqura' && calId !== 'islamic') return true;
+  if (!_polyfillTested) {
+    try {
+      PolyfillTemporal.PlainDate.from({ calendar: 'islamic-umalqura', year: 2026, month: 1, day: 1 });
+      _polyfillSupportsIslamic = true;
+    } catch {
+      _polyfillSupportsIslamic = false;
+    }
+    _polyfillTested = true;
+  }
+  return _polyfillSupportsIslamic;
+}
+
+/**
+ * 日历实现缓存：calId → 使用原生还是 polyfill
+ */
+const _calImplCache = new Map<string, boolean>();
+
+/**
+ * 判断给定日历 ID 应使用原生 Temporal 还是 polyfill。
+ * - 无原生 Temporal → 始终用 polyfill
+ * - 原生支持该日历 → 用原生
+ * - 原生不支持但 polyfill 支持 → 用 polyfill
+ * - 两者都不支持 → 用原生（调用方自行 catch）
+ */
+export function useNativeForCalendar(calId: string): boolean {
+  const cached = _calImplCache.get(calId);
+  if (cached !== undefined) return cached;
+
+  let result: boolean;
+  if (!_native) {
+    result = false;
+  } else if (nativeSupportsCalendar(calId)) {
+    result = true;
+  } else if (polyfillSupportsCalendar(calId)) {
+    result = false;
+  } else {
+    result = true; // 两者都不支持，用原生（让调用方看到原生错误）
+  }
+  _calImplCache.set(calId, result);
+  return result;
+}
+
+/**
+ * 获取指定日历对应的 Temporal 实现（原生或 polyfill）。
+ */
+export function getTemporalForCalendar(calId: string): typeof PolyfillTemporal {
+  return useNativeForCalendar(calId) && _native ? _native : PolyfillTemporal;
+}
+
+/**
+ * 获取默认的 Temporal 实现（用于不指定日历的场景，如 PlainDate.from 不带 calendar）。
+ * 优先原生，回退 polyfill。
+ */
+export const Temporal: typeof PolyfillTemporal = _native ?? PolyfillTemporal;
 
 // 使用 TypeScript 的 namespace merging：
 // 1) `export const Temporal` 提供运行时值（供 `Temporal.PlainDate.from()` 调用）
 // 2) `export namespace Temporal` 重新导出 polyfill 的类型（供 `d: Temporal.PlainDate` 注解）
 // 这样消费方 `import { Temporal }` 后可以同时使用值和类型。
-export const Temporal: typeof PolyfillTemporal = _resolved;
-
-// 重新导出类型命名空间，使 `Temporal.PlainDate` 可用作类型注解。
-// 注意：这不是 `export type { Temporal }`（那会与 const 冲突），
-// 而是用 namespace 声明将类型成员透传给消费方。
 export namespace Temporal {
   export type PlainDate = PolyfillTemporal.PlainDate;
   export type PlainDateTime = PolyfillTemporal.PlainDateTime;
@@ -42,6 +106,4 @@ export namespace Temporal {
   export type Duration = PolyfillTemporal.Duration;
   export type Instant = PolyfillTemporal.Instant;
   export type ZonedDateTime = PolyfillTemporal.ZonedDateTime;
-  // Calendar 和 Now 在 polyfill 中是值而非类型，这里不重新导出它们。
-  // 如果需要 Calendar 类型，请直接从 polyfill 导入。
 }
