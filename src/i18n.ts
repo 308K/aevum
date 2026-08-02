@@ -71,8 +71,9 @@ export function formatNumber(n: number): string {
 
 /**
  * 本地化日期时间（公历）。
- * 使用 TC39 Temporal PlainDate/PlainDateTime 做日期分量提取，再以 Intl.DateTimeFormat 做本地化展示。
- * Temporal 保证日期分量不受时区/DST 影响；Intl 仅负责文本格式化。
+ * 直接用 Intl.DateTimeFormat 格式化传入的 Date 对象。
+ * 注意：此函数用于展示公历日期（如 createdAt 时间戳），
+ * 不涉及多历法转换；历法感知的日期格式化请用 calendar.ts 的 formatEventDate()。
  */
 export function formatGregorian(date: Date, withTime = false): string {
   const opts: Intl.DateTimeFormatOptions = {
