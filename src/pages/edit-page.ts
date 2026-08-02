@@ -97,7 +97,9 @@ export class EditPage extends LitElement {
       margin-top: 2px;
     }
     .time-input {
+      display: block;
       width: 100%;
+      min-width: 0;
       padding: 14px 16px;
       border-radius: 14px;
       border: 1px solid var(--md-sys-color-outline);
@@ -106,6 +108,7 @@ export class EditPage extends LitElement {
       font: inherit;
       font-size: 1rem;
       outline: none;
+      box-sizing: border-box;
     }
     .time-input:focus {
       border-color: var(--md-sys-color-primary);
