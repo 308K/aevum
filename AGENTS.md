@@ -22,15 +22,15 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 ## Architecture
 入口 `index.html` → `src/main.ts`（启动引导 + 注册 PWA）→ `src/app.ts`（`AevumApp` 根组件，按路由在 `home-page` / `edit-page` / `settings-page` 间切换）。
 - **状态层**：`src/store/{events,settings,tags,themes}.ts` 各自封装 `localStorage` 读写，并提供 `on*Change(fn)` 订阅；组件通过订阅而非 prop drilling 获取更新（`themes` 实为 `settings.customThemes` 的派生管理）。
-- **计算层**：`src/utils/calendar.ts`（多历法 ↔ 公历键的双向转换、`formatEventDate` 本地化，纪元名用内部权威映射）与 `src/utils/time-calc.ts`（差异引擎 `computeDiff`、自定义日界限 `parseBoundary`/`logicalDaySerial`、下一次发生日 `nextOccurrenceDate`）。二者为**纯函数、无 DOM**，是测试重点。
+- **计算层**：`src/utils/calendar.ts`（多历法 ↔ 公历键的双向转换、`formatEventDate` 本地化，纪元名用内部权威映射）与 `src/utils/time-calc.ts`（差异引擎 `computeDiff`、自定义日界限 `parseBoundary`/`logicalDaySerial`、下一次发生日 `nextOccurrenceDate`）。二者为**纯函数、无 DOM**，是测试重点。日期/历法算术基于 TC39 Temporal API（通过 `src/utils/temporal.ts` 桥接模块导入，原生或 `@js-temporal/polyfill`）。
 - **展示层**：`time-display.ts` 等组件消费计算层结果；`share-image.ts` / `image-file.ts` 负责事件分享图的离屏渲染与压缩。
 
 ## Hard constraints
-- 历法与时间计算**一律走原生 `Intl` API**；禁止引入重型日期库（date-fns / moment / dayjs 等）。
+- 历法与时间计算**一律走 TC39 Temporal API**（原生或 `@js-temporal/polyfill`），通过 `src/utils/temporal.ts` 桥接模块统一导入。禁止引入重型日期库（date-fns / moment / dayjs 等）。展示格式化仍使用 `Intl.DateTimeFormat`（Temporal 的 `toLocaleString` 底层也是 Intl，但 polyfill 的 era 字段不完整）。
 - 可见文案**禁止硬编码**，必须走 `t()` + `src/locales` 字典；新增语言务必在 `src/i18n.ts` 的 `DICTS` 注册，否则该语言下会回退到 `zh-CN` 且缺失键显示键名。
 - 持久化只用 `localStorage`，键名统一 `aevum.*.v1`（events / settings / tags）；新增存储须「先读后写」并经对应 `on*Change` 通知订阅者，否则 UI 不刷新。
 - 组件使用 Lit 装饰器，**必须保持 `tsconfig.json`：`experimentalDecorators: true` 且 `useDefineForClassFields: false`**，否则 `@property` 会在子类字段初始化时被覆盖而失效。
-- 不依赖 `Intl` 的 `era` 字段做非公历纪元本地化（Android Chrome 等引擎 ICU 被裁减会退化成 "BC" 且不汉化）；纪元名一律用 `calendar.ts` 内的权威常量映射。
+- 历法与时间计算**一律走 TC39 Temporal API**（通过 `src/utils/temporal.ts` 桥接），禁止引入重型日期库（date-fns / moment / dayjs 等）。展示格式化可继续使用 `Intl.DateTimeFormat`。
 
 ## Security considerations
 纯前端、无后端、无账号、无网络请求、无密钥/凭证、无遥测。全部用户数据仅存于浏览器 `localStorage`。唯一的外部输入是「导入备份」（`src/utils/backup.ts` 的 `importBackup`）：解析用户提供的 JSON 文件，须做结构校验、**禁止 `eval`/`Function`、禁止把字段直接当 HTML 注入 DOM**。分享图导出为客户端 canvas，不离开设备。
@@ -40,9 +40,14 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
   `Remove-Item -LiteralPath 'D:\dev\aevum\dist' -Recurse -Force`（PowerShell），随后 `bun run build`。（`bash` 的 `rm` 也会被拦截且 fail-closed，勿用。）
 - **会话恢复回退**：IDE 会话恢复偶发把文件回退到最近一次编辑态；关键修复后请用 grep 特征串核对 `dist/` 产物是否真正包含改动，避免「改了但没构建进去」。
 - **本地化 `<select>` 年份键**：历法年份键形如 `chinese|2026`，locale 无关、不受 era bug 影响，跨历法比较/排序请直接用它而非格式化后的字符串。
+- **Temporal 历法标识符映射**：`islamic` 在 Temporal 中不存在，`src/utils/calendar.ts` 的 `temporalCalId()` 会将其映射为 `islamic-umalqura`（与 Intl 的 `islamic` 结果一致）。
+- **Temporal era 与 Intl era 不一致**：Temporal 返回英文小写 era（如 `"reiwa"`），Intl 返回本地化 era（如 `"令和"`）。`resolveYearStart()` 在搜索日本和历年份时使用 Intl 匹配 era，而非 Temporal 的 era 属性。
 
 ## Testing instructions
-无测试框架 / 无 CI / 无 linter 强制门禁；回归靠两个冒烟脚本（纯 `Intl`、无 DOM，直接用 `bun` 跑）：
-- `bun scripts/smoke.ts` —— 核心逻辑：历法键↔公历往返、农历/干支/各非公历纪元本地化、日界限、多粒度、枚举（约 25 条断言）。
+无测试框架 / 无 CI / 无 linter 强制门禁；回归靠冒烟脚本（纯逻辑、无 DOM）：
+- `bun scripts/smoke.ts` —— 核心逻辑：历法键↔公历往返、农历/干支/各非公历纪元本地化、日界限、多粒度、枚举（约 68 条断言）。使用 `@js-temporal/polyfill`（bun 无原生 Temporal）。
+- `deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts` —— Temporal 专项测试：与 smoke.ts 相同的断言，但使用 Deno 原生 Temporal（验证原生兼容性）。
 - `bun scripts/smoke-themes.ts` —— 自定义主题色逻辑：增 / 删 / 改 / 同色去重 / 删当前色回退默认。
+- `bun scripts/smoke-dst.ts` —— DST 日进位回归。
+- `bun scripts/smoke-backup.ts` —— 备份导入清洗。
 修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑对应脚本。

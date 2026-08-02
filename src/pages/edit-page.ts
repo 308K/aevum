@@ -14,6 +14,7 @@ import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/switch/switch.js';
 import { CALENDAR_IDS } from '../utils/calendar.js';
+import { Temporal } from '../utils/temporal.js';
 import type { CalendarId, Granularity, Recurrence } from '../types.js';
 import { addEvent, getEvent, updateEvent } from '../store/events.js';
 import { getSettings } from '../store/settings.js';
@@ -53,8 +54,12 @@ const REC_I18N_KEYS: Record<Recurrence, 'fieldRecurNone' | 'recurWeekly' | 'recu
 };
 
 function toISO(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  const pd = Temporal.PlainDate.from({
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+  });
+  return pd.toString();
 }
 
 @customElement('edit-page')
@@ -347,12 +352,18 @@ export class EditPage extends LitElement {
     const r = this.recurrence;
     if (r === 'none') return '';
     const locale = getLocale();
+    const pd = Temporal.PlainDate.from({
+      year: this.gregDate.getFullYear(),
+      month: this.gregDate.getMonth() + 1,
+      day: this.gregDate.getDate(),
+    });
     if (r === 'weekly') {
+      // Temporal dayOfWeek: 1=Mon..7=Sun；转为 Date 以复用 Intl 格式化
       const wd = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(this.gregDate);
       return t('recurSummaryWeekly', { weekday: wd });
     }
     if (r === 'monthly') {
-      return t('recurSummaryMonthly', { day: this.gregDate.getDate() });
+      return t('recurSummaryMonthly', { day: pd.day });
     }
     const md = new Intl.DateTimeFormat(locale, { month: 'long', day: 'numeric' }).format(this.gregDate);
     return t('recurSummaryYearly', { date: md });

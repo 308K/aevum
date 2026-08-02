@@ -9,6 +9,7 @@ import { getEvents, replaceAllEvents } from '../store/events.js';
 import { getTags, replaceTags, normalizeEventTags } from '../store/tags.js';
 import { getSettings, updateSettings } from '../store/settings.js';
 import { CALENDAR_IDS } from './calendar.js';
+import { Temporal } from './temporal.js';
 
 const GRANULARITIES: Granularity[] = ['day', 'dhms', 'ymd', 'ywd', 'wd'];
 const RECURRENCES: Recurrence[] = ['none', 'weekly', 'monthly', 'yearly'];
@@ -26,9 +27,9 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 function todayStamp(): string {
-  const d = new Date();
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`;
+  const now = Temporal.Now.plainDateISO();
+  const p = (n: number | string) => String(n).padStart(2, '0');
+  return `${now.year}${p(now.month)}${p(now.day)}`;
 }
 
 /** 导出备份 */
