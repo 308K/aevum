@@ -82,11 +82,21 @@ function resolveLocale(locale: string): Locale {
 
 const fmtCache = new Map<string, Intl.DateTimeFormat>();
 
+/**
+ * Intl 日历标签映射。
+ * 应用层 'islamic' 在 Intl 中需要显式指定变体（Firefox 会报错要求指定），
+ * 映射为 'islamic-umalqura'（与 Temporal 的 temporalCalId 保持一致）。
+ */
+function intlCalTag(cal: CalendarId): string {
+  if (cal === 'islamic') return 'islamic-umalqura';
+  return cal;
+}
+
 function fmt(locale: string, cal: CalendarId, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {
   const key = `${locale}|${cal}|${JSON.stringify(opts)}`;
   let f = fmtCache.get(key);
   if (!f) {
-    const tag = cal === 'gregory' ? locale : `${locale}-u-ca-${cal}`;
+    const tag = cal === 'gregory' ? locale : `${locale}-u-ca-${intlCalTag(cal)}`;
     f = new Intl.DateTimeFormat(tag, opts);
     fmtCache.set(key, f);
   }
