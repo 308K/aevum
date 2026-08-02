@@ -16,6 +16,7 @@ import {
   formatYearMonthHeader,
   type CalDayCell,
 } from '../utils/calendar.js';
+import { Temporal } from '../utils/temporal.js';
 import type { CalendarId, WeekStart } from '../types.js';
 import { getLocale, t } from '../i18n.js';
 import { getSettings, onSettingsChange } from '../store/settings.js';
@@ -25,15 +26,23 @@ const GRID_ID = 'aevum-cal-grid';
 const HINT_ID = 'aevum-cal-hint';
 
 function toISO(d: Date): string {
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+  const pd = Temporal.PlainDate.from({
+    year: d.getFullYear(),
+    month: d.getMonth() + 1,
+    day: d.getDate(),
+  });
+  return pd.toString();
 }
 
 function fromISO(iso: string): Date | null {
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso);
   if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return Number.isNaN(d.getTime()) ? null : d;
+  try {
+    const pd = Temporal.PlainDate.from(iso);
+    return new Date(pd.year, pd.month - 1, pd.day);
+  } catch {
+    return null;
+  }
 }
 
 /** 取某 locale 的每周首日列索引（0=周日 … 6=周六）
@@ -380,37 +389,43 @@ export class DateCalendar extends LitElement {
     const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.locale);
     if (!cells.length) return;
     const cur = fromISO(this.focusKey) ?? fromISO(this.value) ?? new Date();
-    let next: Date | null = null;
+    const curPd = Temporal.PlainDate.from({
+      year: cur.getFullYear(),
+      month: cur.getMonth() + 1,
+      day: cur.getDate(),
+    });
+    let nextPd: Temporal.PlainDate | null = null;
     switch (e.key) {
       case 'ArrowRight':
-        next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1);
+        nextPd = curPd.add({ days: 1 });
         break;
       case 'ArrowLeft':
-        next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() - 1);
+        nextPd = curPd.subtract({ days: 1 });
         break;
       case 'ArrowDown':
-        next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 7);
+        nextPd = curPd.add({ days: 7 });
         break;
       case 'ArrowUp':
-        next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() - 7);
+        nextPd = curPd.subtract({ days: 7 });
         break;
       case 'Home':
-        next = new Date(cur.getFullYear(), cur.getMonth(), 1);
+        nextPd = Temporal.PlainDate.from({ year: curPd.year, month: curPd.month, day: 1 });
         break;
       case 'End':
-        next = new Date(cur.getFullYear(), cur.getMonth(), cells.length);
+        nextPd = Temporal.PlainDate.from({ year: curPd.year, month: curPd.month, day: cells.length });
         break;
       case 'PageUp':
-        next = new Date(cur.getFullYear(), cur.getMonth() - 1, cur.getDate());
+        nextPd = curPd.subtract({ months: 1 });
         break;
       case 'PageDown':
-        next = new Date(cur.getFullYear(), cur.getMonth() + 1, cur.getDate());
+        nextPd = curPd.add({ months: 1 });
         break;
       default:
         return; // Enter/Space 等交给按钮默认行为触发选择
     }
     e.preventDefault();
-    this.setFocusDate(next);
+    const next = nextPd ? new Date(nextPd.year, nextPd.month - 1, nextPd.day) : null;
+    if (next) this.setFocusDate(next);
   }
 
   /** 计算实际应获得 tabindex=0 的日格 ISO（焦点日 → 选中日 → 今天 → 首日） */

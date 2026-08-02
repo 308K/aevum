@@ -2,7 +2,8 @@
  * 轻量级 i18n 架构
  * - 文本资源与业务逻辑分离，键值对映射
  * - 新增语言仅需添加字典文件并在 DICTS 中注册
- * - 深度集成原生 Intl API 处理日期/数字本地化
+ * - 日期/数字本地化：优先使用 TC39 Temporal（原生或 @js-temporal/polyfill），
+ *   回退到 Intl.DateTimeFormat（公历展示用 Intl 足够）
  */
 import { zhCN, type LocaleDict } from './locales/zh-CN.js';
 import { enUS } from './locales/en-US.js';
@@ -68,12 +69,18 @@ export function formatNumber(n: number): string {
   return new Intl.NumberFormat(currentLocale).format(n);
 }
 
-/** 本地化日期时间（公历，Intl.DateTimeFormat） */
+/**
+ * 本地化日期时间（公历）。
+ * 直接用 Intl.DateTimeFormat 格式化传入的 Date 对象。
+ * 注意：此函数用于展示公历日期（如 createdAt 时间戳），
+ * 不涉及多历法转换；历法感知的日期格式化请用 calendar.ts 的 formatEventDate()。
+ */
 export function formatGregorian(date: Date, withTime = false): string {
-  return new Intl.DateTimeFormat(currentLocale, {
+  const opts: Intl.DateTimeFormatOptions = {
     year: 'numeric',
     month: 'long',
     day: 'numeric',
     ...(withTime ? { hour: '2-digit', minute: '2-digit' } : {}),
-  }).format(date);
+  };
+  return new Intl.DateTimeFormat(currentLocale, opts).format(date);
 }
