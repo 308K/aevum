@@ -161,6 +161,9 @@ export class DateCalendar extends LitElement {
       outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 2px;
     }
+    .day.muted {
+      color: color-mix(in oklch, var(--md-sys-color-on-surface) 42%, transparent);
+    }
     .day.today {
       box-shadow: inset 0 0 0 1.5px var(--md-sys-color-primary);
       font-weight: 600;
@@ -331,6 +334,22 @@ export class DateCalendar extends LitElement {
     this.requestUpdate();
   }
 
+  /** 取得相对当前视图偏移 delta（±1）个月的年/月键；越界（年份选项外）返回 null */
+  private adjacentMonthKeys(delta: number): { yearKey: string; monthKey: string } | null {
+    const years = yearOptions(this.calendar, this.refDate, this.locale);
+    const months = monthOptions(this.calendar, this.viewYearKey, this.locale);
+    const mi = months.findIndex((m) => m.key === this.viewMonthKey);
+    const next = mi + delta;
+    if (next >= 0 && next < months.length) {
+      return { yearKey: this.viewYearKey, monthKey: months[next].key };
+    }
+    const yi = years.findIndex((y) => y.key === this.viewYearKey) + delta;
+    if (yi < 0 || yi >= years.length) return null;
+    const ny = years[yi].key;
+    const nm = monthOptions(this.calendar, ny, this.locale);
+    return { yearKey: ny, monthKey: delta > 0 ? nm[0].key : nm[nm.length - 1].key };
+  }
+
   private jumpToday() {
     const sel = keysFromGregorian(new Date(), this.calendar);
     this.viewYearKey = sel.yearKey;
@@ -438,17 +457,26 @@ export class DateCalendar extends LitElement {
     const valDate = fromISO(this.value);
     const selKeys = valDate ? keysFromGregorian(valDate, this.calendar) : null;
     const todayKeys = keysFromGregorian(new Date(), this.calendar);
+    const now = new Date();
 
     const leading = cells.length ? ((cells[0].greg.getDay() - firstDOW + 7) % 7) : 0;
     const trailing = (7 - ((leading + cells.length) % 7)) % 7;
 
-    // 拼成 7 列网格（含前导/后置占位），再按行切分
-    const flat: (CalDayCell | null)[] = [
-      ...Array.from({ length: leading }, () => null),
-      ...cells,
-      ...Array.from({ length: trailing }, () => null),
+    // 前导/后置：取相邻月份的真实日格，以灰色显示（而非空白占位）
+    const prev = this.adjacentMonthKeys(-1);
+    const next = this.adjacentMonthKeys(1);
+    const prevDays = prev ? monthCalendarDays(this.calendar, prev.yearKey, prev.monthKey, locale) : [];
+    const nextDays = next ? monthCalendarDays(this.calendar, next.yearKey, next.monthKey, locale) : [];
+    const leadingCells = leading ? prevDays.slice(Math.max(0, prevDays.length - leading)) : [];
+    const trailingCells = trailing ? nextDays.slice(0, trailing) : [];
+
+    // 拼成 7 列网格（含相邻月灰色日），再按行切分
+    const flat: ({ cell: CalDayCell; muted: boolean } | null)[] = [
+      ...leadingCells.map((c) => ({ cell: c, muted: true })),
+      ...cells.map((c) => ({ cell: c, muted: false })),
+      ...trailingCells.map((c) => ({ cell: c, muted: true })),
     ];
-    const rows: (CalDayCell | null)[][] = [];
+    const rows: ({ cell: CalDayCell; muted: boolean } | null)[][] = [];
     for (let i = 0; i < flat.length; i += 7) rows.push(flat.slice(i, i + 7));
 
     const fk = this.effectiveFocusKey(cells);
@@ -481,9 +509,9 @@ export class DateCalendar extends LitElement {
 
           ${rows.map(
             (row) => html`<div class="grid-row" role="row">
-              ${row.map((cell) =>
-                cell
-                  ? this.renderDay(cell, selKeys, todayKeys, fk, headerLabel)
+              ${row.map((entry) =>
+                entry
+                  ? this.renderDay(entry.cell, entry.muted, valDate, now, fk, headerLabel)
                   : html`<span class="empty" role="gridcell" aria-disabled="true"></span>`
               )}
             </div>`
@@ -501,25 +529,31 @@ export class DateCalendar extends LitElement {
 
   private renderDay(
     c: CalDayCell,
-    selKeys: ReturnType<typeof keysFromGregorian> | null,
-    todayKeys: ReturnType<typeof keysFromGregorian>,
+    muted: boolean,
+    valDate: Date | null,
+    now: Date,
     fk: string,
     headerLabel: string
   ) {
     const isSel =
-      selKeys &&
-      c.dayKey === selKeys.dayKey &&
-      this.viewYearKey === selKeys.yearKey &&
-      this.viewMonthKey === selKeys.monthKey;
+      valDate != null &&
+      c.greg.getFullYear() === valDate.getFullYear() &&
+      c.greg.getMonth() === valDate.getMonth() &&
+      c.greg.getDate() === valDate.getDate();
     const isToday =
-      c.dayKey === todayKeys.dayKey &&
-      this.viewYearKey === todayKeys.yearKey &&
-      this.viewMonthKey === todayKeys.monthKey;
+      c.greg.getFullYear() === now.getFullYear() &&
+      c.greg.getMonth() === now.getMonth() &&
+      c.greg.getDate() === now.getDate();
     const iso = toISO(c.greg);
+    // 灰色（相邻月）日格：用其真实年月表头，避免读屏误读为当前月
+    const ownKeys = muted ? keysFromGregorian(c.greg, this.calendar) : null;
+    const cellHeader = ownKeys
+      ? formatYearMonthHeader(this.calendar, ownKeys.yearKey, ownKeys.monthKey, this.locale)
+      : headerLabel;
     // 完整日期作为读屏标签（含年月与「今天」提示），单日数字本身信息不足
-    const label = `${headerLabel} ${c.dayDisplay}${isToday ? ' ' + t('calToday') : ''}`;
+    const label = `${cellHeader} ${c.dayDisplay}${isToday ? ' ' + t('calToday') : ''}`;
     return html`<button
-      class="day ${isSel ? 'selected' : ''} ${isToday ? 'today' : ''}"
+      class="day ${muted ? 'muted' : ''} ${isSel ? 'selected' : ''} ${isToday ? 'today' : ''}"
       type="button"
       role="gridcell"
       data-iso=${iso}
