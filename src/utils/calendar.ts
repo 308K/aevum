@@ -34,13 +34,39 @@ export interface CalOption {
 
 /**
  * 将应用层 CalendarId 映射为 Temporal 支持的日历标识符。
- * - 'islamic' 在 Temporal 中不存在，映射为 'islamic-umalqura'（与 Intl 的 'islamic' 一致）
- * - 其他历法标识符在 Temporal 中与 Intl 一致
+ *
+ * 重要：不同浏览器的原生 Temporal 对日历标识符的支持程度不同。
+ * - Chrome 原生支持 'islamic-umalqura'（与 Intl 的 'islamic' 一致）
+ * - Firefox 原生可能不支持 'islamic-umalqura'，需回退到 'islamic'
+ * - Safari 无原生 Temporal，走 polyfill（两者都支持）
+ *
+ * 因此对伊斯兰历做运行时探测：依次尝试候选 ID，取第一个可用的。
+ * 探测结果在模块级别缓存（首次调用后不再重复探测）。
  */
 function temporalCalId(cal: CalendarId): string {
-  if (cal === 'islamic') return 'islamic-umalqura';
+  if (cal === 'islamic') {
+    const cached = _islamicCalCache;
+    if (cached) return cached;
+    // 优先 umalqura（与 Intl 行为一致），回退到通用 islamic
+    const candidates: string[] = ['islamic-umalqura', 'islamic'];
+    for (const id of candidates) {
+      try {
+        Temporal.PlainDate.from({ calendar: id, year: 1446, month: 1, day: 1 });
+        _islamicCalCache = id;
+        return id;
+      } catch {
+        /* 该 ID 不被当前运行时支持，继续尝试下一个 */
+      }
+    }
+    // 极端情况：两个都不支持，仍返回首选（调用方会 catch）
+    _islamicCalCache = 'islamic-umalqura';
+    return 'islamic-umalqura';
+  }
   return cal;
 }
+
+/** 缓存伊斯兰历探测结果（模块级单次写入） */
+let _islamicCalCache: string | undefined;
 
 /** 农历日汉字名（1–30） */
 const LUNAR_DAY_NAMES = [
