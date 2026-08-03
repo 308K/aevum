@@ -673,17 +673,18 @@ export function formatYearMonthHeader(
   monthKey: string,
   displayLocale = 'zh-CN'
 ): string {
+  // 农历始终使用中文展示（无论 UI 语言）
+  if (cal === 'chinese') {
+    const ye = yearOptions('chinese', new Date(), 'zh-CN').find((e) => e.key === yearKey);
+    const me = monthOptions('chinese', yearKey, 'zh-CN').find((e) => e.key === monthKey);
+    return `${ye?.display ?? ''} ${me?.display ?? ''}`.trim();
+  }
+
   if (!displayLocale.startsWith('zh')) {
     const months = monthOptions(cal, yearKey, displayLocale) as MonthEntry[];
     const me = months.find((e) => e.key === monthKey);
     if (!me) return '';
     return fmt(displayLocale, cal, { year: 'numeric', month: 'long', era: 'short' }).format(me.firstSeen);
-  }
-
-  if (cal === 'chinese') {
-    const ye = yearOptions('chinese', new Date(), 'zh-CN').find((e) => e.key === yearKey);
-    const me = monthOptions('chinese', yearKey, 'zh-CN').find((e) => e.key === monthKey);
-    return `${ye?.display ?? ''} ${me?.display ?? ''}`.trim();
   }
 
   if (cal === 'gregory') {

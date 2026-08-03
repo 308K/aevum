@@ -5,6 +5,7 @@
  * - 公历/农历/伊斯兰历/希伯来历/波斯历/佛教历/日本和历均按各自历法展示
  * - 无障碍：role=grid 语义、roving tabindex、方向键/Home/End/PageUp/PageDown 键盘导航、
  *   每个日格提供完整日期的 aria-label、选中态用 aria-selected
+ * - 快速跳转：点击表头年份/月份可展开年份网格视图与月份网格视图
  */
 import { LitElement, html, css, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
@@ -24,6 +25,9 @@ import { icon } from '../icons.js';
 
 const GRID_ID = 'aevum-cal-grid';
 const HINT_ID = 'aevum-cal-hint';
+
+/** 视图模式：日期网格 / 年份选择 / 月份选择 */
+type ViewMode = 'days' | 'years' | 'months';
 
 function toISO(d: Date): string {
   const pd = Temporal.PlainDate.from({
@@ -87,16 +91,44 @@ export class DateCalendar extends LitElement {
       gap: 2px;
       margin-bottom: 8px;
     }
-    .title {
+    .title-group {
       flex: 1;
       min-width: 0;
-      text-align: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 2px;
+    }
+    .title-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      border: none;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface);
+      font: inherit;
       font-size: 0.95rem;
       font-weight: 600;
-      color: var(--md-sys-color-on-surface);
+      cursor: pointer;
+      padding: 4px 8px;
+      transition: background 0.15s ease;
       white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
+    }
+    .title-btn:hover {
+      background: color-mix(in oklch, var(--md-sys-color-on-surface) 8%, transparent);
+    }
+    .title-btn:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+    .title-btn.active {
+      color: var(--md-sys-color-primary);
+    }
+    .title-sep {
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 0.95rem;
+      user-select: none;
     }
     .nav {
       display: inline-flex;
@@ -185,6 +217,122 @@ export class DateCalendar extends LitElement {
     .day.selected.today {
       box-shadow: none;
     }
+
+    /* ---- 年份/月份选择视图 ---- */
+    .view-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-height: 260px;
+    }
+    .view-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 0 8px;
+    }
+    .view-title {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--md-sys-color-on-surface);
+    }
+    .year-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+      overflow-y: auto;
+      max-height: 280px;
+      padding: 2px;
+      scrollbar-width: thin;
+      scrollbar-color: var(--md-sys-color-outline-variant) transparent;
+    }
+    .year-grid::-webkit-scrollbar {
+      width: 6px;
+    }
+    .year-grid::-webkit-scrollbar-thumb {
+      background: var(--md-sys-color-outline-variant);
+      border-radius: 3px;
+    }
+    .year-cell {
+      padding: 10px 4px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s ease, color 0.15s ease;
+      min-height: 40px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.2;
+    }
+    .year-cell:hover {
+      background: color-mix(in oklch, var(--md-sys-color-on-surface) 8%, transparent);
+    }
+    .year-cell:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+    .year-cell.selected {
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-weight: 700;
+    }
+    .year-cell.current {
+      box-shadow: inset 0 0 0 1.5px var(--md-sys-color-primary);
+      font-weight: 600;
+    }
+    .year-cell.selected.current {
+      box-shadow: none;
+    }
+    .month-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 4px;
+    }
+    .month-cell {
+      padding: 14px 4px;
+      border: none;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--md-sys-color-on-surface);
+      font: inherit;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      text-align: center;
+      transition: background 0.15s ease, color 0.15s ease;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.2;
+    }
+    .month-cell:hover {
+      background: color-mix(in oklch, var(--md-sys-color-on-surface) 8%, transparent);
+    }
+    .month-cell:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+    .month-cell.selected {
+      background: var(--md-sys-color-primary);
+      color: var(--md-sys-color-on-primary);
+      font-weight: 700;
+    }
+    .month-cell.current {
+      box-shadow: inset 0 0 0 1.5px var(--md-sys-color-primary);
+      font-weight: 600;
+    }
+    .month-cell.selected.current {
+      box-shadow: none;
+    }
+
     .footer {
       display: flex;
       justify-content: center;
@@ -233,6 +381,10 @@ export class DateCalendar extends LitElement {
   @state() private viewMonthKey = '';
   /** 当前键盘/视觉焦点所在的日（公历 ISO），用于 roving tabindex */
   @state() private focusKey = '';
+  /** 当前视图模式：日期网格 / 年份选择 / 月份选择 */
+  @state() private viewMode: ViewMode = 'days';
+  /** 年份视图中需要滚动到的年份键（触发后清空） */
+  @state() private yearScrollKey = '';
   /** 标记一次键盘导航后需要把 DOM 焦点移到指定日格 */
   private pendingFocus = false;
   /** 上次用于初始化视图的 value，避免视图被已选值反复重置 */
@@ -253,16 +405,29 @@ export class DateCalendar extends LitElement {
   }
 
   protected updated(changed: PropertyValues) {
-    if (this.pendingFocus && this.focusKey) {
+    if (this.pendingFocus && this.focusKey && this.viewMode === 'days') {
       const el = this.shadowRoot?.querySelector<HTMLButtonElement>(`[data-iso="${this.focusKey}"]`);
       el?.focus();
       this.pendingFocus = false;
+    }
+    // 年份选择视图打开时，滚动到当前选中年份
+    if (this.viewMode === 'years' && this.yearScrollKey) {
+      const el = this.shadowRoot?.querySelector<HTMLElement>(
+        `[data-year-key="${CSS.escape(this.yearScrollKey)}"]`
+      );
+      el?.scrollIntoView({ block: 'center', behavior: 'auto' });
+      this.yearScrollKey = '';
     }
     void changed;
   }
 
   private get locale() {
     return getLocale();
+  }
+
+  /** 用于历法年/月/日展示格式化的 locale（农历始终用中文） */
+  private get calLocale(): string {
+    return this.calendar === 'chinese' ? 'zh-CN' : this.locale;
   }
 
   /** 当前生效的每周首日列索引：跟随设置（默认按 locale 习惯） */
@@ -302,7 +467,7 @@ export class DateCalendar extends LitElement {
 
   /** 视图切换后，让焦点落在新月份中「相同日序号」（超出则月末）的日格上 */
   private reseatFocusAfterViewChange(oldDay: number) {
-    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.locale);
+    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.calLocale);
     if (!cells.length) return;
     const idx = Math.min(Math.max(oldDay, 1), cells.length) - 1;
     this.focusKey = toISO(cells[idx].greg);
@@ -310,8 +475,8 @@ export class DateCalendar extends LitElement {
 
   private stepMonth(delta: number) {
     const oldDay = this.currentFocusDay();
-    const years = yearOptions(this.calendar, this.refDate, this.locale);
-    const months = monthOptions(this.calendar, this.viewYearKey, this.locale);
+    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
+    const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
     const mi = months.findIndex((m) => m.key === this.viewMonthKey);
     const next = mi + delta;
     if (next >= 0 && next < months.length) {
@@ -321,7 +486,7 @@ export class DateCalendar extends LitElement {
       const yi = years.findIndex((y) => y.key === this.viewYearKey) + delta;
       if (yi < 0 || yi >= years.length) return;
       this.viewYearKey = years[yi].key;
-      const nm = monthOptions(this.calendar, this.viewYearKey, this.locale);
+      const nm = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
       this.viewMonthKey = delta > 0 ? nm[0].key : nm[nm.length - 1].key;
     }
     this.reseatFocusAfterViewChange(oldDay);
@@ -330,12 +495,12 @@ export class DateCalendar extends LitElement {
 
   private stepYear(delta: number) {
     const oldDay = this.currentFocusDay();
-    const years = yearOptions(this.calendar, this.refDate, this.locale);
+    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
     const yi = years.findIndex((y) => y.key === this.viewYearKey) + delta;
     if (yi < 0 || yi >= years.length) return;
     this.viewYearKey = years[yi].key;
     // 新年份可能不含当前月份（如闰月/缺失月），回退到该年首月
-    const months = monthOptions(this.calendar, this.viewYearKey, this.locale);
+    const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
     if (!months.some((m) => m.key === this.viewMonthKey)) {
       this.viewMonthKey = months[0].key;
     }
@@ -345,8 +510,8 @@ export class DateCalendar extends LitElement {
 
   /** 取得相对当前视图偏移 delta（±1）个月的年/月键；越界（年份选项外）返回 null */
   private adjacentMonthKeys(delta: number): { yearKey: string; monthKey: string } | null {
-    const years = yearOptions(this.calendar, this.refDate, this.locale);
-    const months = monthOptions(this.calendar, this.viewYearKey, this.locale);
+    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
+    const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
     const mi = months.findIndex((m) => m.key === this.viewMonthKey);
     const next = mi + delta;
     if (next >= 0 && next < months.length) {
@@ -355,7 +520,7 @@ export class DateCalendar extends LitElement {
     const yi = years.findIndex((y) => y.key === this.viewYearKey) + delta;
     if (yi < 0 || yi >= years.length) return null;
     const ny = years[yi].key;
-    const nm = monthOptions(this.calendar, ny, this.locale);
+    const nm = monthOptions(this.calendar, ny, this.calLocale);
     return { yearKey: ny, monthKey: delta > 0 ? nm[0].key : nm[nm.length - 1].key };
   }
 
@@ -364,6 +529,7 @@ export class DateCalendar extends LitElement {
     this.viewYearKey = sel.yearKey;
     this.viewMonthKey = sel.monthKey;
     this.focusKey = toISO(new Date());
+    this.viewMode = 'days';
     this.requestUpdate();
   }
 
@@ -384,9 +550,10 @@ export class DateCalendar extends LitElement {
     this.emit(d);
   }
 
-  /** 网格键盘导航：方向键/Home/End/PageUp/PageDown */
+  /** 网格键盘导航：方向键/Home/End/PageUp/PageDown
+   *  Ctrl+Home / Ctrl+End：切换上/下年 */
   private onGridKeydown(e: KeyboardEvent) {
-    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.locale);
+    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.calLocale);
     if (!cells.length) return;
     const cur = fromISO(this.focusKey) ?? fromISO(this.value) ?? new Date();
     const curPd = Temporal.PlainDate.from({
@@ -409,11 +576,15 @@ export class DateCalendar extends LitElement {
         nextPd = curPd.subtract({ days: 7 });
         break;
       case 'Home':
-        nextPd = Temporal.PlainDate.from({ year: curPd.year, month: curPd.month, day: 1 });
-        break;
+        // Home: 前一年
+        this.stepYear(-1);
+        e.preventDefault();
+        return;
       case 'End':
-        nextPd = Temporal.PlainDate.from({ year: curPd.year, month: curPd.month, day: cells.length });
-        break;
+        // End: 后一年
+        this.stepYear(1);
+        e.preventDefault();
+        return;
       case 'PageUp':
         nextPd = curPd.subtract({ months: 1 });
         break;
@@ -428,7 +599,7 @@ export class DateCalendar extends LitElement {
     if (next) this.setFocusDate(next);
   }
 
-  /** 计算实际应获得 tabindex=0 的日格 ISO（焦点日 → 选中日 → 今天 → 首日） */
+  /** 计算实际应获得 tabindex=0 的日格 ISO（焦点日 -> 选中日 -> 今天 -> 首日） */
   private effectiveFocusKey(cells: CalDayCell[]): string {
     if (this.focusKey && cells.some((c) => toISO(c.greg) === this.focusKey)) return this.focusKey;
     const sel = fromISO(this.value);
@@ -453,9 +624,244 @@ export class DateCalendar extends LitElement {
     return cells[0] ? toISO(cells[0].greg) : '';
   }
 
+  // ---- 年份/月份选择视图相关 ----
+
+  /** 打开年份选择视图，并滚动到当前选中年份 */
+  private openYearView() {
+    this.viewMode = 'years';
+    this.yearScrollKey = this.viewYearKey;
+  }
+
+  /** 打开月份选择视图 */
+  private openMonthView() {
+    this.viewMode = 'months';
+  }
+
+  /** 在年份视图中选择某年，返回日期网格 */
+  private selectYear(yearKey: string) {
+    this.viewYearKey = yearKey;
+    // 新年份可能不含当前月份（如闰月/缺失月），回退到该年首月
+    const months = monthOptions(this.calendar, yearKey, this.calLocale);
+    if (!months.some((m) => m.key === this.viewMonthKey)) {
+      this.viewMonthKey = months[0].key;
+    }
+    this.viewMode = 'days';
+    this.reseatFocusAfterViewChange(this.currentFocusDay());
+    this.pendingFocus = true;
+    this.requestUpdate();
+  }
+
+  /** 在月份视图中选择某月，返回日期网格 */
+  private selectMonth(monthKey: string) {
+    this.viewMonthKey = monthKey;
+    this.viewMode = 'days';
+    this.reseatFocusAfterViewChange(this.currentFocusDay());
+    this.pendingFocus = true;
+    this.requestUpdate();
+  }
+
+  /** 年份视图键盘导航：方向键移动焦点，Enter 选择，Escape 返回 */
+  private onYearGridKeydown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    if (!target.dataset.yearKey) return;
+    const cells = Array.from(
+      this.shadowRoot?.querySelectorAll<HTMLButtonElement>('[data-year-key]') ?? []
+    );
+    const idx = cells.findIndex((c) => c.dataset.yearKey === target.dataset.yearKey);
+    if (idx < 0) return;
+    let nextIdx = idx;
+    switch (e.key) {
+      case 'ArrowRight': nextIdx = Math.min(idx + 1, cells.length - 1); break;
+      case 'ArrowLeft': nextIdx = Math.max(idx - 1, 0); break;
+      case 'ArrowDown': nextIdx = Math.min(idx + 3, cells.length - 1); break;
+      case 'ArrowUp': nextIdx = Math.max(idx - 3, 0); break;
+      case 'Home': nextIdx = 0; break;
+      case 'End': nextIdx = cells.length - 1; break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        this.selectYear(target.dataset.yearKey);
+        return;
+      case 'Escape':
+        e.preventDefault();
+        this.viewMode = 'days';
+        this.requestUpdate();
+        return;
+      default:
+        return;
+    }
+    if (nextIdx !== idx) {
+      e.preventDefault();
+      cells[nextIdx]?.focus();
+      // 滚动到可见
+      cells[nextIdx]?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+    }
+  }
+
+  /** 月份视图键盘导航：方向键移动焦点，Enter 选择，Escape 返回 */
+  private onMonthGridKeydown(e: KeyboardEvent) {
+    const target = e.target as HTMLElement;
+    if (!target.dataset.monthKey) return;
+    const cells = Array.from(
+      this.shadowRoot?.querySelectorAll<HTMLButtonElement>('[data-month-key]') ?? []
+    );
+    const idx = cells.findIndex((c) => c.dataset.monthKey === target.dataset.monthKey);
+    if (idx < 0) return;
+    let nextIdx = idx;
+    switch (e.key) {
+      case 'ArrowRight': nextIdx = Math.min(idx + 1, cells.length - 1); break;
+      case 'ArrowLeft': nextIdx = Math.max(idx - 1, 0); break;
+      case 'ArrowDown': nextIdx = Math.min(idx + 3, cells.length - 1); break;
+      case 'ArrowUp': nextIdx = Math.max(idx - 3, 0); break;
+      case 'Home': nextIdx = 0; break;
+      case 'End': nextIdx = cells.length - 1; break;
+      case 'Enter':
+      case ' ':
+        e.preventDefault();
+        this.selectMonth(target.dataset.monthKey);
+        return;
+      case 'Escape':
+        e.preventDefault();
+        this.viewMode = 'days';
+        this.requestUpdate();
+        return;
+      default:
+        return;
+    }
+    if (nextIdx !== idx) {
+      e.preventDefault();
+      cells[nextIdx]?.focus();
+    }
+  }
+
+  /** 渲染年份选择视图 */
+  private renderYearView() {
+    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
+    const todayYearKey = keysFromGregorian(new Date(), this.calendar).yearKey;
+    const selYearKey = this.viewYearKey;
+
+    // 拆分显示：年份的 display 可能含额外文字（如 "2026年 丙午年"），取前半部分
+    return html`
+      <div
+        class="view-panel"
+        role="grid"
+        aria-label=${t('calSelectYear')}
+        @keydown=${this.onYearGridKeydown}
+      >
+        <div class="view-header">
+          <span class="view-title">${t('calSelectYear')}</span>
+        </div>
+        <div class="year-grid">
+          ${years.map((y) => {
+            const isSel = y.key === selYearKey;
+            const isCur = y.key === todayYearKey;
+            return html`
+              <button
+                class="year-cell ${isSel ? 'selected' : ''} ${isCur ? 'current' : ''}"
+                type="button"
+                role="gridcell"
+                data-year-key=${y.key}
+                tabindex=${isSel ? '0' : '-1'}
+                aria-selected=${isSel ? 'true' : 'false'}
+                @click=${() => this.selectYear(y.key)}
+              >
+                ${y.display}
+              </button>
+            `;
+          })}
+        </div>
+      </div>
+    `;
+  }
+
+  /** 渲染月份选择视图 */
+  private renderMonthView() {
+    const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
+    const todayMonthKey = keysFromGregorian(new Date(), this.calendar).monthKey;
+    const selMonthKey = this.viewMonthKey;
+
+    return html`
+      <div
+        class="view-panel"
+        role="grid"
+        aria-label=${t('calSelectMonth')}
+        @keydown=${this.onMonthGridKeydown}
+      >
+        <div class="view-header">
+          <span class="view-title">${t('calSelectMonth')}</span>
+        </div>
+        <div class="month-grid">
+          ${months.map((m) => {
+            const isSel = m.key === selMonthKey;
+            const isCur = m.key === todayMonthKey && this.viewYearKey === keysFromGregorian(new Date(), this.calendar).yearKey;
+            return html`
+              <button
+                class="month-cell ${isSel ? 'selected' : ''} ${isCur ? 'current' : ''}"
+                type="button"
+                role="gridcell"
+                data-month-key=${m.key}
+                tabindex=${isSel ? '0' : '-1'}
+                aria-selected=${isSel ? 'true' : 'false'}
+                @click=${() => this.selectMonth(m.key)}
+              >
+                ${m.display}
+              </button>
+            `;
+          })}
+        </div>
+      </div>
+    `;
+  }
+
   render() {
     const locale = this.locale;
-    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, locale);
+
+    // 年份/月份选择视图
+    if (this.viewMode === 'years') {
+      return html`
+        <div class="picker">
+          <div class="header">
+            <button class="nav" type="button" aria-label=${t('actionBack')} @click=${() => { this.viewMode = 'days'; this.requestUpdate(); }}>
+              ${icon('back', 20)}
+            </button>
+            <div class="title-group">
+              <span class="title-btn active">${t('calSelectYear')}</span>
+            </div>
+            <span class="nav" style="visibility:hidden"></span>
+          </div>
+          ${this.renderYearView()}
+          <div class="footer">
+            <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    if (this.viewMode === 'months') {
+      const yearLabel = yearOptions(this.calendar, this.refDate, this.calLocale)
+        .find((y) => y.key === this.viewYearKey)?.display ?? this.viewYearKey;
+      return html`
+        <div class="picker">
+          <div class="header">
+            <button class="nav" type="button" aria-label=${t('actionBack')} @click=${() => { this.viewMode = 'days'; this.requestUpdate(); }}>
+              ${icon('back', 20)}
+            </button>
+            <div class="title-group">
+              <span class="title-btn active">${yearLabel}</span>
+            </div>
+            <span class="nav" style="visibility:hidden"></span>
+          </div>
+          ${this.renderMonthView()}
+          <div class="footer">
+            <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>
+          </div>
+        </div>
+      `;
+    }
+
+    // 日期网格视图（默认）
+    const calLocale = this.calLocale;
+    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, calLocale);
     const firstDOW = this.resolvedFirstDOW;
 
     // 周列标题：以 2023-01-01（周日）为基准，按首日偏移归列；同时取窄/全称供可见与读屏使用
@@ -468,10 +874,8 @@ export class DateCalendar extends LitElement {
       headers[col] = { narrow: wdNarrow.format(d), long: wdLong.format(d) };
     }
 
-    // 选中 / 今天的历法键（用于高亮比对）
+    // 选中日期（用于高亮比对）
     const valDate = fromISO(this.value);
-    const selKeys = valDate ? keysFromGregorian(valDate, this.calendar) : null;
-    const todayKeys = keysFromGregorian(new Date(), this.calendar);
     const now = new Date();
 
     const leading = cells.length ? ((cells[0].greg.getDay() - firstDOW + 7) % 7) : 0;
@@ -480,8 +884,8 @@ export class DateCalendar extends LitElement {
     // 前导/后置：取相邻月份的真实日格，以灰色显示（而非空白占位）
     const prev = this.adjacentMonthKeys(-1);
     const next = this.adjacentMonthKeys(1);
-    const prevDays = prev ? monthCalendarDays(this.calendar, prev.yearKey, prev.monthKey, locale) : [];
-    const nextDays = next ? monthCalendarDays(this.calendar, next.yearKey, next.monthKey, locale) : [];
+    const prevDays = prev ? monthCalendarDays(this.calendar, prev.yearKey, prev.monthKey, calLocale) : [];
+    const nextDays = next ? monthCalendarDays(this.calendar, next.yearKey, next.monthKey, calLocale) : [];
     const leadingCells = leading ? prevDays.slice(Math.max(0, prevDays.length - leading)) : [];
     const trailingCells = trailing ? nextDays.slice(0, trailing) : [];
 
@@ -495,7 +899,12 @@ export class DateCalendar extends LitElement {
     for (let i = 0; i < flat.length; i += 7) rows.push(flat.slice(i, i + 7));
 
     const fk = this.effectiveFocusKey(cells);
-    const headerLabel = formatYearMonthHeader(this.calendar, this.viewYearKey, this.viewMonthKey, locale);
+
+    // 拆分表头为年份和月份两部分，分别可点击
+    const yearOpts = yearOptions(this.calendar, this.refDate, this.calLocale);
+    const monthOpts = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
+    const yearDisplay = yearOpts.find((y) => y.key === this.viewYearKey)?.display ?? this.viewYearKey;
+    const monthDisplay = monthOpts.find((m) => m.key === this.viewMonthKey)?.display ?? this.viewMonthKey;
 
     return html`
       <div class="picker">
@@ -506,7 +915,15 @@ export class DateCalendar extends LitElement {
           <button class="nav" type="button" aria-label=${t('calPrevMonth')} aria-controls=${GRID_ID} @click=${() => this.stepMonth(-1)}>
             ${icon('chevronLeft', 20)}
           </button>
-          <div class="title">${headerLabel}</div>
+          <div class="title-group">
+            <button class="title-btn" type="button" @click=${() => this.openYearView()} aria-label=${t('calSelectYear')} title=${t('calYearViewHint')}>
+              ${yearDisplay}
+            </button>
+            <span class="title-sep">·</span>
+            <button class="title-btn" type="button" @click=${() => this.openMonthView()} aria-label=${t('calSelectMonth')} title=${t('calMonthViewHint')}>
+              ${monthDisplay}
+            </button>
+          </div>
           <button class="nav" type="button" aria-label=${t('calNextMonth')} aria-controls=${GRID_ID} @click=${() => this.stepMonth(1)}>
             ${icon('chevronRight', 20)}
           </button>
@@ -515,7 +932,7 @@ export class DateCalendar extends LitElement {
           </button>
         </div>
 
-        <div class="grid" id=${GRID_ID} role="grid" aria-label=${headerLabel} aria-describedby=${HINT_ID} @keydown=${this.onGridKeydown}>
+        <div class="grid" id=${GRID_ID} role="grid" aria-label=${`${yearDisplay} ${monthDisplay}`} aria-describedby=${HINT_ID} @keydown=${this.onGridKeydown}>
           <div class="weekdays" role="row">
             ${headers.map(
               (h) => html`<div class="wd" role="columnheader" aria-label=${h.long}>${h.narrow}</div>`
@@ -526,7 +943,7 @@ export class DateCalendar extends LitElement {
             (row) => html`<div class="grid-row" role="row">
               ${row.map((entry) =>
                 entry
-                  ? this.renderDay(entry.cell, entry.muted, valDate, now, fk, headerLabel)
+                  ? this.renderDay(entry.cell, entry.muted, valDate, now, fk, `${yearDisplay} ${monthDisplay}`)
                   : html`<span class="empty" role="gridcell" aria-disabled="true"></span>`
               )}
             </div>`
@@ -563,7 +980,7 @@ export class DateCalendar extends LitElement {
     // 灰色（相邻月）日格：用其真实年月表头，避免读屏误读为当前月
     const ownKeys = muted ? keysFromGregorian(c.greg, this.calendar) : null;
     const cellHeader = ownKeys
-      ? formatYearMonthHeader(this.calendar, ownKeys.yearKey, ownKeys.monthKey, this.locale)
+      ? formatYearMonthHeader(this.calendar, ownKeys.yearKey, ownKeys.monthKey, this.calLocale)
       : headerLabel;
     // 完整日期作为读屏标签（含年月与「今天」提示），单日数字本身信息不足
     const label = `${cellHeader} ${c.dayDisplay}${isToday ? ' ' + t('calToday') : ''}`;
