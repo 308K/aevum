@@ -139,15 +139,23 @@ export const enUS: LocaleDict = {
   toastImportFailed: 'Import failed: invalid file format',
   settingsBgImage: 'Card background',
   settingsBgImageHint: 'Upload an image as this event card\'s background; dimmed automatically for readability',
+  settingsBgImageDropHint: 'Click to upload, drag an image here, or Ctrl+V to paste from clipboard',
   actionUpload: 'Upload image',
   actionClear: 'Clear',
   toastBgSet: 'Background updated',
   toastBgCleared: 'Default background restored',
   toastBgTooLarge: 'Image too large; please pick one under 10MB',
+  toastBgNotImage: 'Not a valid image',
+  actionPaste: 'Paste image',
+  toastPasteUnsupported: 'Clipboard read not supported, try Ctrl+V instead',
+  toastPasteNoImage: 'No image in clipboard',
 
   // Share
   actionShareImage: 'Save as image',
   toastImageSaved: 'Image saved',
+  actionCopyImage: 'Copy image',
+  toastImageCopied: 'Image copied to clipboard',
+  toastImageCopyFailed: 'Copy failed, please try saving as image',
 
   // Save as image (dedicated page)
   pageShareImageTitle: 'Save as Image',

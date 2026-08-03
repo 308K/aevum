@@ -148,15 +148,23 @@ export const zhCN = {
   toastImportFailed: '导入失败：文件格式无效',
   settingsBgImage: '卡片背景图',
   settingsBgImageHint: '上传图片作为该事件卡片的背景，自动压暗以保证文字可读',
+  settingsBgImageDropHint: '点击上传、拖拽图片到此处，或 Ctrl+V 粘贴剪贴板图片',
   actionUpload: '上传图片',
   actionClear: '清除',
   toastBgSet: '背景图已更新',
   toastBgCleared: '已恢复默认背景',
   toastBgTooLarge: '图片过大，请选择10MB以内的图片',
+  toastBgNotImage: '不是有效的图片',
+  actionPaste: '粘贴图片',
+  toastPasteUnsupported: '当前环境不支持读取剪贴板，请用 Ctrl+V 粘贴',
+  toastPasteNoImage: '剪贴板中没有图片',
 
   // 分享
   actionShareImage: '保存为图片',
   toastImageSaved: '图片已保存',
+  actionCopyImage: '复制图片',
+  toastImageCopied: '图片已复制到剪贴板',
+  toastImageCopyFailed: '复制失败，请尝试保存为图片',
 
   // 保存为图片（专用页面）
   pageShareImageTitle: '保存为图片',

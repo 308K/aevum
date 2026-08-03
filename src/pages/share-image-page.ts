@@ -7,6 +7,7 @@ import { customElement, state, query } from 'lit/decorators.js';
 import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/button/filled-button.js';
+import '@material/web/button/outlined-button.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/slider/slider.js';
 import type { MdOutlinedSelect } from '@material/web/select/outlined-select.js';
@@ -16,7 +17,7 @@ import { getSettings, PRESET_SEED_COLORS } from '../store/settings.js';
 import { onLocaleChange, t } from '../i18n.js';
 import { icon } from '../icons.js';
 import { resolveDark } from '../theme.js';
-import { drawShareImage, saveEventShareImage, type CardStyle, W, H } from '../utils/share-image.js';
+import { drawShareImage, saveEventShareImage, copyEventShareImageToClipboard, type CardStyle, W, H } from '../utils/share-image.js';
 import { toast } from '../components/app-snackbar.js';
 import '../components/color-picker.js';
 
@@ -213,6 +214,12 @@ export class ShareImagePage extends LitElement {
       opacity: 0.5;
       pointer-events: none;
     }
+    .save-bar .bar-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
   `;
 
   @state() private events: AevumEvent[] = getEvents();
@@ -223,6 +230,7 @@ export class ShareImagePage extends LitElement {
   @state() private cardIntensity = 0.5;
   @state() private cardOpacity = 0.5;
   @state() private saving = false;
+  @state() private copying = false;
 
   @query('#preview') private previewCanvas!: HTMLCanvasElement;
 
@@ -325,6 +333,20 @@ export class ShareImagePage extends LitElement {
       /* 忽略：环境不支持导出 */
     } finally {
       this.saving = false;
+    }
+  }
+
+  private async onCopy() {
+    const ev = this.selectedEvent;
+    if (!ev || this.copying) return;
+    this.copying = true;
+    try {
+      await copyEventShareImageToClipboard(ev, this.options);
+      toast(t('toastImageCopied'));
+    } catch {
+      toast(t('toastImageCopyFailed'));
+    } finally {
+      this.copying = false;
     }
   }
 
@@ -490,11 +512,17 @@ export class ShareImagePage extends LitElement {
               </div>
             </div>
 
-            <div class="save-bar" ?disabled=${!ev || this.saving}>
-              <md-filled-button @click=${this.onSave} ?disabled=${!ev || this.saving}>
-                <span slot="icon" style="display:inline-flex">${icon('download', 18)}</span>
-                ${this.saving ? t('shareImageGenerating') : t('actionShareImage')}
-              </md-filled-button>
+            <div class="save-bar" ?disabled=${!ev || this.saving || this.copying}>
+              <div class="bar-actions">
+                <md-filled-button @click=${this.onSave} ?disabled=${!ev || this.saving}>
+                  <span slot="icon" style="display:inline-flex">${icon('download', 18)}</span>
+                  ${this.saving ? t('shareImageGenerating') : t('actionShareImage')}
+                </md-filled-button>
+                <md-outlined-button @click=${this.onCopy} ?disabled=${!ev || this.copying}>
+                  <span slot="icon" style="display:inline-flex">${icon('contentCopy', 18)}</span>
+                  ${t('actionCopyImage')}
+                </md-outlined-button>
+              </div>
             </div>
           `}
     `;

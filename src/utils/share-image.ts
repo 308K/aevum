@@ -377,3 +377,15 @@ export async function saveEventShareImage(ev: AevumEvent, opts?: Partial<ShareIm
   const safeName = ev.name.replace(/[\\/:*?"<>|\s]+/g, '-').slice(0, 40) || 'event';
   downloadBlob(blob, `aevum-${safeName}.png`);
 }
+
+/** 生成分享图并复制到剪贴板 */
+export async function copyEventShareImageToClipboard(ev: AevumEvent, opts?: Partial<ShareImageOptions>): Promise<void> {
+  const canvas = document.createElement('canvas');
+  canvas.width = W;
+  canvas.height = H;
+  await drawShareImage(canvas, ev, opts);
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/png'));
+  if (!blob) throw new Error('png-encode-failed');
+  if (!navigator.clipboard || !navigator.clipboard.write) throw new Error('clipboard-unsupported');
+  await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
+}

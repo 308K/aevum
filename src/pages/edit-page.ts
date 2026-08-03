@@ -220,6 +220,19 @@ export class EditPage extends LitElement {
       color: var(--md-sys-color-on-surface-variant);
       margin-top: -12px;
     }
+    /* 拖拽放置区：包裹缩略图 + 按钮的区域，拖拽时高亮 */
+    .bg-drop-zone {
+      border-radius: 18px;
+      padding: 10px;
+      margin: -10px;
+      transition: background 0.15s ease, outline 0.15s ease;
+      outline: 2px solid transparent;
+      outline-offset: 2px;
+    }
+    .bg-drop-zone.drag-over {
+      background: color-mix(in oklch, var(--md-sys-color-primary-container) 40%, transparent);
+      outline-color: var(--md-sys-color-primary);
+    }
   `;
 
   @state() private editId: string | null = null;
@@ -234,16 +247,20 @@ export class EditPage extends LitElement {
   @state() private tags: string[] = [];
   @state() private pinned = false;
   @state() private bgImage: string | undefined = undefined;
+  @state() private dragOverBg = false;
   @state() private newTagName = '';
   @state() private nameError = '';
 
   private unsubLocale?: () => void;
   private unsubTags?: () => void;
+  private boundPaste!: (e: ClipboardEvent) => void;
 
   connectedCallback() {
     super.connectedCallback();
     this.unsubLocale = onLocaleChange(() => this.requestUpdate());
     this.unsubTags = onTagsChange(() => this.requestUpdate());
+    this.boundPaste = (e: ClipboardEvent) => this.onPaste(e);
+    window.addEventListener('paste', this.boundPaste);
     // 解析 ?id=
     const hash = location.hash;
     const q = hash.includes('?') ? new URLSearchParams(hash.slice(hash.indexOf('?') + 1)) : null;
@@ -286,6 +303,7 @@ export class EditPage extends LitElement {
     super.disconnectedCallback();
     this.unsubLocale?.();
     this.unsubTags?.();
+    window.removeEventListener('paste', this.boundPaste);
   }
 
   /* ---------- 历法日期选择联动 ---------- */
@@ -336,17 +354,82 @@ export class EditPage extends LitElement {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    await this.applyBgFile(file);
+  }
+
+  /** 从剪贴板粘贴或拖拽得到的图片文件 → 压缩 → 设置背景图 */
+  private async applyBgFile(file: File) {
     try {
       this.bgImage = await fileToDownscaledDataURL(file);
       toast(t('toastBgSet'));
-    } catch {
-      toast(t('toastBgTooLarge'));
+    } catch (err) {
+      toast(err instanceof Error && err.message === 'too-large' ? t('toastBgTooLarge') : t('toastBgNotImage'));
     }
   }
 
   private onBgClear() {
     this.bgImage = undefined;
     toast(t('toastBgCleared'));
+  }
+
+  /* ---------- 拖拽上传 & 剪贴板粘贴 ---------- */
+
+  private onBgDragOver(e: DragEvent) {
+    e.preventDefault();
+    if (e.dataTransfer?.types.includes('Files')) {
+      e.dataTransfer.dropEffect = 'copy';
+      this.dragOverBg = true;
+    }
+  }
+
+  private onBgDragLeave() {
+    this.dragOverBg = false;
+  }
+
+  private async onBgDrop(e: DragEvent) {
+    e.preventDefault();
+    this.dragOverBg = false;
+    const file = e.dataTransfer?.files?.[0];
+    if (!file) return;
+    await this.applyBgFile(file);
+  }
+
+  private async onPaste(e: ClipboardEvent) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) {
+          e.preventDefault();
+          await this.applyBgFile(file);
+          return;
+        }
+      }
+    }
+  }
+
+  /** 点击「粘贴图片」按钮：尝试读取剪贴板中的图片 */
+  private async onPasteButtonClick() {
+    try {
+      if (!navigator.clipboard || !navigator.clipboard.read) {
+        toast(t('toastPasteUnsupported'));
+        return;
+      }
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        const imgType = item.types.find((t) => t.startsWith('image/'));
+        if (imgType) {
+          const blob = await item.getType(imgType);
+          const file = new File([blob], 'pasted.png', { type: imgType });
+          await this.applyBgFile(file);
+          return;
+        }
+      }
+      toast(t('toastPasteNoImage'));
+    } catch {
+      toast(t('toastPasteUnsupported'));
+    }
   }
 
   /* ---------- 循环预览 ---------- */
@@ -529,21 +612,31 @@ export class EditPage extends LitElement {
         </div>
 
         <div class="section-label">${t('settingsBgImage')}</div>
-        <div class="bg-row">
-          ${this.bgImage
-            ? html`<div class="bg-thumb" style="background-image: url('${this.bgImage}')"></div>`
-            : html`<div class="bg-thumb empty">${icon('image', 28)}</div>`}
-          <div class="bg-actions">
-            <md-outlined-button type="button" @click=${this.triggerBgUpload}>
-              <span slot="icon" style="display:inline-flex">${icon('upload', 18)}</span>${t('actionUpload')}
-            </md-outlined-button>
+        <div
+          class="bg-drop-zone ${this.dragOverBg ? 'drag-over' : ''}"
+          @dragover=${this.onBgDragOver}
+          @dragleave=${this.onBgDragLeave}
+          @drop=${this.onBgDrop}
+        >
+          <div class="bg-row">
             ${this.bgImage
-              ? html`<md-text-button type="button" @click=${this.onBgClear}>${t('actionClear')}</md-text-button>`
-              : null}
+              ? html`<div class="bg-thumb" style="background-image: url('${this.bgImage}')"></div>`
+              : html`<div class="bg-thumb empty">${icon('image', 28)}</div>`}
+            <div class="bg-actions">
+              <md-outlined-button type="button" @click=${this.triggerBgUpload}>
+                <span slot="icon" style="display:inline-flex">${icon('upload', 18)}</span>${t('actionUpload')}
+              </md-outlined-button>
+              <md-outlined-button type="button" @click=${this.onPasteButtonClick}>
+                <span slot="icon" style="display:inline-flex">${icon('contentCopy', 18)}</span>${t('actionPaste')}
+              </md-outlined-button>
+              ${this.bgImage
+                ? html`<md-text-button type="button" @click=${this.onBgClear}>${t('actionClear')}</md-text-button>`
+                : null}
+            </div>
+            <input id="bgFile" class="hidden-input" type="file" accept="image/*" @change=${this.onBgFile} />
           </div>
-          <input id="bgFile" class="hidden-input" type="file" accept="image/*" @change=${this.onBgFile} />
         </div>
-        <div class="hint-text">${t('settingsBgImageHint')}</div>
+        <div class="hint-text">${t('settingsBgImageDropHint')}</div>
 
         <div class="switch-row">
           <div class="label">${t('fieldPinned')}</div>
