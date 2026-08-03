@@ -14,6 +14,8 @@
 // 导入 polyfill（在 Deno 中会使用 globalThis.Temporal 如果已存在）
 // 在 Deno 中 native Temporal 已存在，polyfill 不会覆盖它
 import '@js-temporal/polyfill';
+import { ensureTemporalReady } from '../src/utils/temporal.ts';
+await ensureTemporalReady();
 
 import {
   formatEventDate,

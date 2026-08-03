@@ -10,6 +10,10 @@
  * 此时下列断言仅作为「无回归」守卫；要真正验证 DST 修复，请在实行夏令时的时区运行，例如：
  *     TZ=America/New_York bun scripts/smoke-dst.ts
  */
+import { ensureTemporalReady } from '../src/utils/temporal.js';
+
+await ensureTemporalReady();
+
 import {
   keysFromGregorian,
   gregorianFromKeys,

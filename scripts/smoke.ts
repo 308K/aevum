@@ -1,4 +1,8 @@
 /* Aevum 核心逻辑冒烟测试（纯 Intl / 时间引擎，无 DOM） */
+import { ensureTemporalReady } from '../src/utils/temporal.js';
+
+await ensureTemporalReady();
+
 import {
   formatEventDate,
   formatYearMonthHeader,
@@ -9,9 +13,9 @@ import {
   dayOptions,
   monthCalendarDays,
   type CalendarId,
-} from 'D:/dev/aevum/src/utils/calendar.js';
-import { computeDiff, logicalDaySerial, parseBoundary, nextOccurrenceDate, effectiveEvent } from 'D:/dev/aevum/src/utils/time-calc.js';
-import type { AevumEvent, Recurrence } from 'D:/dev/aevum/src/types.js';
+} from '../src/utils/calendar.js';
+import { computeDiff, logicalDaySerial, parseBoundary, nextOccurrenceDate, effectiveEvent } from '../src/utils/time-calc.js';
+import type { AevumEvent, Recurrence } from '../src/types.js';
 
 let pass = 0;
 let fail = 0;
@@ -141,7 +145,7 @@ if (typeof (globalThis as any).localStorage === 'undefined') {
 if (typeof (globalThis as any).navigator === 'undefined') {
   (globalThis as any).navigator = { language: 'zh-CN', userAgent: 'node' };
 }
-const tagsMod = await import('D:/dev/aevum/src/store/tags.js');
+const tagsMod = await import('../src/store/tags.js');
 const baseEvent = (tags: string[]): AevumEvent => ({
   id: 'x', name: 'x', date: '2026-01-01', calendar: 'gregory', granularity: 'day', tags, pinned: false, createdAt: 0,
 });

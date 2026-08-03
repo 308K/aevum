@@ -11,6 +11,9 @@ class MemStorage {
 }
 (globalThis as unknown as { localStorage: MemStorage }).localStorage = new MemStorage();
 
+import { ensureTemporalReady } from '../src/utils/temporal.js';
+await ensureTemporalReady();
+
 import { importBackup } from '../src/utils/backup.js';
 import { getEvents } from '../src/store/events.js';
 import { getSettings } from '../src/store/settings.js';

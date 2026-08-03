@@ -12,11 +12,18 @@ import { applyLocalePref, onLocaleChange, t } from './i18n.js';
 import { icon } from './icons.js';
 import { isInstallable, onInstallAvailable, promptInstall } from './install.js';
 import { toast } from './components/app-snackbar.js';
+
+/* 首屏页面立即加载（主页是初始视图） */
 import './pages/home-page.js';
-import './pages/edit-page.js';
-import './pages/settings-page.js';
-import './pages/share-image-page.js';
 import './components/app-snackbar.js';
+
+/* 非首屏页面按路由懒加载 */
+const _pageLoaders: Record<string, () => Promise<unknown>> = {
+  edit: () => import('./pages/edit-page.js'),
+  settings: () => import('./pages/settings-page.js'),
+  'share-image': () => import('./pages/share-image-page.js'),
+};
+const _loadedPages = new Set<string>();
 
 type Route = 'home' | 'edit' | 'settings' | 'share-image';
 
@@ -136,6 +143,14 @@ export class AevumApp extends LitElement {
         animation: none;
       }
     }
+    .page-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 48px;
+      color: var(--md-sys-color-on-surface-variant);
+      font-size: 0.9rem;
+    }
   `;
 
   @state() private route: Route = 'home';
@@ -185,6 +200,14 @@ export class AevumApp extends LitElement {
     else if (path.startsWith('#/settings')) this.route = 'settings';
     else if (path.startsWith('#/share-image')) this.route = 'share-image';
     else this.route = 'home';
+    // 懒加载非首屏页面组件
+    if (this.route !== 'home' && !_loadedPages.has(this.route)) {
+      const loader = _pageLoaders[this.route];
+      if (loader) {
+        _loadedPages.add(this.route);
+        loader().then(() => this.requestUpdate());
+      }
+    }
     // 路由切换时重建编辑页（保证表单按 id 重新初始化）
     this.requestUpdate();
   };
@@ -268,9 +291,15 @@ export class AevumApp extends LitElement {
           : null}
         <div class="page" key=${this.route + location.hash}>
           ${this.route === 'home' ? html`<home-page></home-page>` : null}
-          ${this.route === 'edit' ? html`<edit-page></edit-page>` : null}
-          ${this.route === 'settings' ? html`<settings-page></settings-page>` : null}
-          ${this.route === 'share-image' ? html`<share-image-page></share-image-page>` : null}
+          ${this.route === 'edit'
+            ? html`<edit-page></edit-page>`
+            : null}
+          ${this.route === 'settings'
+            ? html`<settings-page></settings-page>`
+            : null}
+          ${this.route === 'share-image'
+            ? html`<share-image-page></share-image-page>`
+            : null}
         </div>
       </main>
 
