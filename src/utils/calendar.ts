@@ -471,9 +471,12 @@ export function monthOptions(cal: CalendarId, yearKey: string, displayLocale = '
 
     // 从年初开始逐月推进，用 add({months:1}) 而非 month:m 构造，
     // 确保闰月（如 chinese 的 M06L）能被正确覆盖。
+    // 日本和历 monthsInYear 始终为 12，但年号可能年中更替（如平成31仅1-4月），
+    // 故须检查 yearKey 是否仍属当前年号年，不匹配则停止遍历。
     let pd = yearStart;
     for (let i = 0; i < monthsInYear; i++) {
       const k = keyPartsFromTemporal(pd, cal, displayLocale);
+      if (k.yearKey !== yearKey) break; // 年号已更替，后续月份不属于该年号年
       if (!seen.has(k.monthKey)) {
         seen.add(k.monthKey);
         entries.push({ key: k.monthKey, display: k.monthDisplay, firstSeen: fromDate(pd) });
@@ -510,11 +513,13 @@ export function dayOptions(
     if (!yearStart) return [];
 
     // 从 yearStart 开始逐月推进查找目标月份，用 add({months:1}) 覆盖闰月
+    // 同 monthOptions，需检测年号边界，避免跨年号匹配到不属于该年号年的月份
     let monthStart: Temporal.PlainDate | null = null;
     const monthsInYear = yearStart.monthsInYear;
     let pd = yearStart;
     for (let i = 0; i < monthsInYear; i++) {
       const k = keyPartsFromTemporal(pd, cal, displayLocale);
+      if (k.yearKey !== yearKey) break; // 年号已更替，目标月份不存在于该年号年
       if (k.monthKey === monthKey) {
         monthStart = pd;
         break;
@@ -527,6 +532,9 @@ export function dayOptions(
     for (let d = 1; d <= daysInMonth; d++) {
       const tryDate = monthStart.add({ days: d - 1 });
       const k = keyPartsFromTemporal(tryDate, cal, displayLocale);
+      // 月中改元（如大正15年12月25日改昭和）或月初改元（如平成元年1月8日）
+      // 导致同一个月内部分日期不属于选中年月，须过滤
+      if (k.yearKey !== yearKey || k.monthKey !== monthKey) break;
       entries.push({ key: k.dayKey, display: k.dayDisplay });
     }
   }
@@ -552,14 +560,18 @@ export function gregorianFromKeys(sel: DateSelection, cal: CalendarId): Date | n
   const monthsInYear = yearStart.monthsInYear;
 
   // 从 yearStart 开始逐月推进查找目标月份，用 add({months:1}) 覆盖闰月
+  // 同 monthOptions，需检测年号边界，避免跨年号匹配
   let pd = yearStart;
   for (let i = 0; i < monthsInYear; i++) {
     const k = keyPartsFromTemporal(pd, cal, 'zh-CN');
+    if (k.yearKey !== sel.yearKey) break; // 年号已更替
     if (k.monthKey === sel.monthKey) {
       const daysInMonth = pd.daysInMonth;
       for (let d = 1; d <= daysInMonth; d++) {
         const tryDate = pd.add({ days: d - 1 });
         const dk = keyPartsFromTemporal(tryDate, cal, 'zh-CN');
+        // 同 dayOptions，过滤月中改元导致的不属于该年月的日期
+        if (dk.yearKey !== sel.yearKey || dk.monthKey !== sel.monthKey) continue;
         if (dk.dayKey === sel.dayKey) return fromDate(tryDate);
       }
       return null;
