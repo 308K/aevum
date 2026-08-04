@@ -213,10 +213,12 @@ function keyPartsFromTemporal(
     const kp = partsOf(fmt('en-US', 'japanese', { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' }), date);
     const jpEra = jp.era ?? pdCal.era ?? '';
     const jpYearInEra = jp.year ?? String(pdCal.eraYear ?? yearNum);
+    // 中文习惯：元年不称"1年"
+    const jpYearDisplay = displayLocale.startsWith('zh') && jpYearInEra === '1' ? '元' : jpYearInEra;
     return {
       yearKey: `${jpEra}|${jpYearInEra}`,
       yearDisplay: displayLocale.startsWith('zh')
-        ? `${jpEra}${jpYearInEra}年`
+        ? `${jpEra}${jpYearDisplay}年`
         : dp.era
           ? `${dp.era} ${dp.year}`
           : jpYearInEra,
@@ -252,6 +254,28 @@ export function keysFromGregorian(date: Date, cal: CalendarId): DateSelection {
   const pd = toPlainDateForCal(date, calId).withCalendar(calId);
   const k = keyPartsFromTemporal(pd, cal, 'zh-CN');
   return { yearKey: k.yearKey, monthKey: k.monthKey, dayKey: k.dayKey };
+}
+
+/**
+ * 取公历日期所在月的首日对应的历法键。
+ * 用于日本和历月中改元场景：月份归属由月首决定，而非逐日判断。
+ * （参考 React Aria isSameMonth 的 startOfMonth 降维比较策略）
+ */
+export function startOfMonthKeys(date: Date, cal: CalendarId): DateSelection {
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  return keysFromGregorian(first, cal);
+}
+
+/**
+ * 判断两个公历日期是否属于同一历法月。
+ * 日本和历可能月中改元（如 1989-01-08 昭和→平成），
+ * 此时同一个月内逐日 yearKey 不同，但月首 yearKey 一致，
+ * 故用月首键比较而非逐日键比较。
+ */
+export function sameCalendarMonth(a: Date, b: Date, cal: CalendarId): boolean {
+  const ka = startOfMonthKeys(a, cal);
+  const kb = startOfMonthKeys(b, cal);
+  return ka.yearKey === kb.yearKey && ka.monthKey === kb.monthKey;
 }
 
 /* ---------------- 枚举（年/月/日选项） ---------------- */
@@ -471,17 +495,60 @@ export function monthOptions(cal: CalendarId, yearKey: string, displayLocale = '
 
     // 从年初开始逐月推进，用 add({months:1}) 而非 month:m 构造，
     // 确保闰月（如 chinese 的 M06L）能被正确覆盖。
-    // 日本和历 monthsInYear 始终为 12，但年号可能年中更替（如平成31仅1-4月），
-    // 故须检查 yearKey 是否仍属当前年号年，不匹配则停止遍历。
-    let pd = yearStart;
-    for (let i = 0; i < monthsInYear; i++) {
-      const k = keyPartsFromTemporal(pd, cal, displayLocale);
-      if (k.yearKey !== yearKey) break; // 年号已更替，后续月份不属于该年号年
-      if (!seen.has(k.monthKey)) {
-        seen.add(k.monthKey);
-        entries.push({ key: k.monthKey, display: k.monthDisplay, firstSeen: fromDate(pd) });
+    if (cal === 'japanese') {
+      // 日本和历 monthsInYear 始终为 12，但年号可能年中更替。
+      // 月份归属策略：
+      // - 月首属该年号年 → 整月归入
+      // - 月首不属但 yearStart 在该月内且属该年号年 → 整月也归入
+      //   （如平成元年1月：1/1属昭和64，但 yearStart 1/8 属平成 → 1月也归平成元年）
+      // - 月首不属且在 yearStart 之前且 yearStart 不在该月 → 跳过
+      // - 月首不属且在 yearStart 之后 → break（已越过年号边界）
+      const calId = temporalCalId(cal);
+      const T = getTemporalForCalendar(calId);
+      const monthFirstInfo = (pd: Temporal.PlainDate): { yearKey: string; monthKey: string; monthDisplay: string; firstPd: Temporal.PlainDate } => {
+        const greg = pd.withCalendar('gregory');
+        const firstPd = T.PlainDate.from({ year: greg.year, month: greg.month, day: 1 }).withCalendar(calId);
+        const k = keyPartsFromTemporal(firstPd, cal, displayLocale);
+        return { yearKey: k.yearKey, monthKey: k.monthKey, monthDisplay: k.monthDisplay, firstPd };
+      };
+      const yearStartKeys = keyPartsFromTemporal(yearStart, cal, displayLocale);
+      let pd = yearStart;
+      for (let i = 0; i < monthsInYear; i++) {
+        const fk = monthFirstInfo(pd);
+        if (fk.yearKey === yearKey) {
+          // 月首属该年号年
+          if (!seen.has(fk.monthKey)) {
+            seen.add(fk.monthKey);
+            entries.push({ key: fk.monthKey, display: fk.monthDisplay, firstSeen: fromDate(fk.firstPd) });
+          }
+        } else {
+          // 月首不属该年号年
+          if (Temporal.PlainDate.compare(fk.firstPd, yearStart) < 0) {
+            // 月首在 yearStart 之前：检查 yearStart 是否在该月内且属该年号年
+            if (yearStartKeys.yearKey === yearKey && yearStartKeys.monthKey === fk.monthKey) {
+              if (!seen.has(fk.monthKey)) {
+                seen.add(fk.monthKey);
+                entries.push({ key: fk.monthKey, display: fk.monthDisplay, firstSeen: fromDate(fk.firstPd) });
+              }
+            }
+            pd = pd.add({ months: 1 });
+            continue;
+          }
+          break;
+        }
+        pd = pd.add({ months: 1 });
       }
-      pd = pd.add({ months: 1 });
+    } else {
+      // 非日本和历：月份与公历不对齐，直接用 pd 的 key
+      let pd = yearStart;
+      for (let i = 0; i < monthsInYear; i++) {
+        const k = keyPartsFromTemporal(pd, cal, displayLocale);
+        if (!seen.has(k.monthKey)) {
+          seen.add(k.monthKey);
+          entries.push({ key: k.monthKey, display: k.monthDisplay, firstSeen: fromDate(pd) });
+        }
+        pd = pd.add({ months: 1 });
+      }
     }
   }
 
@@ -512,29 +579,61 @@ export function dayOptions(
     const yearStart = resolveYearStart(cal, yearKey, displayLocale);
     if (!yearStart) return [];
 
-    // 从 yearStart 开始逐月推进查找目标月份，用 add({months:1}) 覆盖闰月
-    // 同 monthOptions，需检测年号边界，避免跨年号匹配到不属于该年号年的月份
     let monthStart: Temporal.PlainDate | null = null;
     const monthsInYear = yearStart.monthsInYear;
-    let pd = yearStart;
-    for (let i = 0; i < monthsInYear; i++) {
-      const k = keyPartsFromTemporal(pd, cal, displayLocale);
-      if (k.yearKey !== yearKey) break; // 年号已更替，目标月份不存在于该年号年
-      if (k.monthKey === monthKey) {
-        monthStart = pd;
-        break;
+
+    if (cal === 'japanese') {
+      // 日本和历：月份归属与 monthOptions 一致（月首属 OR yearStart 在该月内且属该年号年）
+      const calId = temporalCalId(cal);
+      const T = getTemporalForCalendar(calId);
+      const gregFirstInfo = (pd: Temporal.PlainDate): { yearKey: string; monthKey: string; firstPd: Temporal.PlainDate } => {
+        const greg = pd.withCalendar('gregory');
+        const firstPd = T.PlainDate.from({ year: greg.year, month: greg.month, day: 1 }).withCalendar(calId);
+        const k = keyPartsFromTemporal(firstPd, cal, displayLocale);
+        return { yearKey: k.yearKey, monthKey: k.monthKey, firstPd };
+      };
+      const yearStartKeys = keyPartsFromTemporal(yearStart, cal, displayLocale);
+      let pd = yearStart;
+      for (let i = 0; i < monthsInYear; i++) {
+        const fk = gregFirstInfo(pd);
+        const belongs = fk.yearKey === yearKey ||
+          (Temporal.PlainDate.compare(fk.firstPd, yearStart) < 0 &&
+           yearStartKeys.yearKey === yearKey && yearStartKeys.monthKey === fk.monthKey);
+        if (!belongs) {
+          if (Temporal.PlainDate.compare(fk.firstPd, yearStart) < 0) {
+            pd = pd.add({ months: 1 });
+            continue;
+          }
+          break;
+        }
+        if (fk.monthKey === monthKey) {
+          monthStart = fk.firstPd;
+          break;
+        }
+        pd = pd.add({ months: 1 });
       }
-      pd = pd.add({ months: 1 });
+    } else {
+      // 非日本和历：月份与公历不对齐，直接用 pd 的 key
+      let pd = yearStart;
+      for (let i = 0; i < monthsInYear; i++) {
+        const k = keyPartsFromTemporal(pd, cal, displayLocale);
+        if (k.monthKey === monthKey) {
+          monthStart = pd;
+          break;
+        }
+        pd = pd.add({ months: 1 });
+      }
     }
     if (!monthStart) return [];
 
+    // 逐日枚举
     const daysInMonth = monthStart.daysInMonth;
     for (let d = 1; d <= daysInMonth; d++) {
       const tryDate = monthStart.add({ days: d - 1 });
       const k = keyPartsFromTemporal(tryDate, cal, displayLocale);
-      // 月中改元（如大正15年12月25日改昭和）或月初改元（如平成元年1月8日）
-      // 导致同一个月内部分日期不属于选中年月，须过滤
-      if (k.yearKey !== yearKey || k.monthKey !== monthKey) break;
+      // 月中改元（如 1989-01-08 昭和→平成）时，同月内部分日期的 yearKey
+      // 与月首不同，但仍属于同一公历月。月份归属由月首决定（React Aria 策略），
+      // 故不按逐日 yearKey 截断，整个公历月的日期都应返回。
       entries.push({ key: k.dayKey, display: k.dayDisplay });
     }
   }
@@ -559,24 +658,58 @@ export function gregorianFromKeys(sel: DateSelection, cal: CalendarId): Date | n
   if (!yearStart) return null;
   const monthsInYear = yearStart.monthsInYear;
 
-  // 从 yearStart 开始逐月推进查找目标月份，用 add({months:1}) 覆盖闰月
-  // 同 monthOptions，需检测年号边界，避免跨年号匹配
-  let pd = yearStart;
-  for (let i = 0; i < monthsInYear; i++) {
-    const k = keyPartsFromTemporal(pd, cal, 'zh-CN');
-    if (k.yearKey !== sel.yearKey) break; // 年号已更替
-    if (k.monthKey === sel.monthKey) {
-      const daysInMonth = pd.daysInMonth;
-      for (let d = 1; d <= daysInMonth; d++) {
-        const tryDate = pd.add({ days: d - 1 });
-        const dk = keyPartsFromTemporal(tryDate, cal, 'zh-CN');
-        // 同 dayOptions，过滤月中改元导致的不属于该年月的日期
-        if (dk.yearKey !== sel.yearKey || dk.monthKey !== sel.monthKey) continue;
-        if (dk.dayKey === sel.dayKey) return fromDate(tryDate);
+  // 定位目标月份的首日
+  let monthStart: Temporal.PlainDate | null = null;
+
+  if (cal === 'japanese') {
+    // 日本和历：月份归属与 monthOptions/dayOptions 一致
+    const calId = temporalCalId(cal);
+    const T = getTemporalForCalendar(calId);
+    const gregFirstInfo = (pd: Temporal.PlainDate): { yearKey: string; monthKey: string; firstPd: Temporal.PlainDate } => {
+      const greg = pd.withCalendar('gregory');
+      const firstPd = T.PlainDate.from({ year: greg.year, month: greg.month, day: 1 }).withCalendar(calId);
+      const k = keyPartsFromTemporal(firstPd, cal, 'zh-CN');
+      return { yearKey: k.yearKey, monthKey: k.monthKey, firstPd };
+    };
+    const yearStartKeys = keyPartsFromTemporal(yearStart, cal, 'zh-CN');
+    let pd = yearStart;
+    for (let i = 0; i < monthsInYear; i++) {
+      const fk = gregFirstInfo(pd);
+      const belongs = fk.yearKey === sel.yearKey ||
+        (Temporal.PlainDate.compare(fk.firstPd, yearStart) < 0 &&
+         yearStartKeys.yearKey === sel.yearKey && yearStartKeys.monthKey === fk.monthKey);
+      if (!belongs) {
+        if (Temporal.PlainDate.compare(fk.firstPd, yearStart) < 0) {
+          pd = pd.add({ months: 1 });
+          continue;
+        }
+        break;
       }
-      return null;
+      if (fk.monthKey === sel.monthKey) {
+        monthStart = fk.firstPd;
+        break;
+      }
+      pd = pd.add({ months: 1 });
     }
-    pd = pd.add({ months: 1 });
+  } else {
+    // 非日本和历：直接逐月查找
+    let pd = yearStart;
+    for (let i = 0; i < monthsInYear; i++) {
+      const k = keyPartsFromTemporal(pd, cal, 'zh-CN');
+      if (k.monthKey === sel.monthKey) {
+        monthStart = pd;
+        break;
+      }
+      pd = pd.add({ months: 1 });
+    }
+  }
+
+  if (!monthStart) return null;
+  const daysInMonth = monthStart.daysInMonth;
+  for (let d = 1; d <= daysInMonth; d++) {
+    const tryDate = monthStart.add({ days: d - 1 });
+    const dk = keyPartsFromTemporal(tryDate, cal, 'zh-CN');
+    if (dk.dayKey === sel.dayKey) return fromDate(tryDate);
   }
   return null;
 }
@@ -607,16 +740,13 @@ export function monthCalendarDays(
     return days.map((d, i) => ({ dayKey: d.key, dayDisplay: d.display, greg: new Date(y, m - 1, i + 1) }));
   }
 
-  // 非公历：从 monthOptions 找到该月的 firstSeen，然后逐日推进
+  // 非公历：从 monthOptions 找到该月的 firstSeen（已是公历月首），然后逐日推进
   const months = monthOptions(cal, yearKey, displayLocale) as MonthEntry[];
   const me = months.find((e) => e.key === monthKey);
   if (!me) return [];
 
   const calId = temporalCalId(cal);
-  const yearStart = resolveYearStart(cal, yearKey, displayLocale);
-  if (!yearStart) return [];
-
-  // 从 firstSeen 对应的 Temporal.PlainDate 开始逐日枚举
+  // firstSeen 已是公历月首（monthOptions 用公历月首判断归属）
   let pd = toPlainDateForCal(me.firstSeen, calId).withCalendar(calId);
   const cells: CalDayCell[] = [];
   for (const d of days) {
@@ -714,7 +844,10 @@ export function formatYearMonthHeader(
 
   if (cal === 'japanese') {
     const [era, yr] = yearKey.split('|');
-    return `${era ?? ''}${yr ?? ''}年${monthNum}月`;
+    // 中文习惯：元年不称"1年"
+    const yrDisplay = yr === '1' ? '元' : yr;
+    // 日本和历 monthKey 即公历月份数，直接使用而非索引
+    return `${era ?? ''}${yrDisplay ?? ''}年${monthKey}月`;
   }
 
   const era = eraName(cal, 'zh-CN');

@@ -14,6 +14,8 @@ import {
   yearOptions,
   monthOptions,
   keysFromGregorian,
+  startOfMonthKeys,
+  sameCalendarMonth,
   formatYearMonthHeader,
   type CalDayCell,
 } from '../utils/calendar.js';
@@ -394,7 +396,8 @@ export class DateCalendar extends LitElement {
     if (this.value && this.value !== this.lastValue) {
       const d = fromISO(this.value);
       if (d) {
-        const sel = keysFromGregorian(d, this.calendar);
+        // 月份归属由月首决定（日本和历月中改元时，选中日的 yearKey 可能与月首不同）
+        const sel = startOfMonthKeys(d, this.calendar);
         this.viewYearKey = sel.yearKey;
         this.viewMonthKey = sel.monthKey;
         this.lastValue = this.value;
@@ -453,6 +456,14 @@ export class DateCalendar extends LitElement {
     return fromISO(this.value) ?? new Date();
   }
 
+  /** 当前视图月份的首日公历日期，用于 sameCalendarMonth 比较 */
+  private get viewRefDate(): Date {
+    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.calLocale);
+    if (cells.length) return cells[0].greg;
+    // 月份无日期（理论上不会发生），回退到今天
+    return new Date();
+  }
+
   private emit(date: Date) {
     this.dispatchEvent(
       new CustomEvent<string>('date-change', { detail: toISO(date), bubbles: true, composed: true })
@@ -473,22 +484,55 @@ export class DateCalendar extends LitElement {
     this.focusKey = toISO(cells[idx].greg);
   }
 
+  /**
+   * 查找相邻的「不同公历月」。
+   * 日本和历允许重复月份（如昭和64年1月与平成元年1月同为 1989-01），
+   * 导航时需跳过映射到同一公历月的条目，否则会出现「两个1月」。
+   */
+  private findAdjacentMonth(delta: number): { yearKey: string; monthKey: string } | null {
+    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
+    const curCells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.calLocale);
+    const curGregId = curCells.length
+      ? `${curCells[0].greg.getFullYear()}-${curCells[0].greg.getMonth()}`
+      : '';
+
+    const yi = years.findIndex((y) => y.key === this.viewYearKey);
+    if (yi < 0) return null;
+
+    // 先在当前年份的剩余月份中搜索
+    const curMonths = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
+    const mi = curMonths.findIndex((m) => m.key === this.viewMonthKey);
+    for (let i = mi + delta; i >= 0 && i < curMonths.length; i += delta) {
+      const cells = monthCalendarDays(this.calendar, this.viewYearKey, curMonths[i].key, this.calLocale);
+      if (cells.length) {
+        const id = `${cells[0].greg.getFullYear()}-${cells[0].greg.getMonth()}`;
+        if (id !== curGregId) return { yearKey: this.viewYearKey, monthKey: curMonths[i].key };
+      }
+    }
+
+    // 跨年搜索：逐年扫描月份，跳过同一公历月的重复条目
+    for (let yOff = yi + delta; yOff >= 0 && yOff < years.length; yOff += delta) {
+      const yk = years[yOff].key;
+      const ms = monthOptions(this.calendar, yk, this.calLocale);
+      const range = delta > 0 ? ms : [...ms].reverse();
+      for (const m of range) {
+        const cells = monthCalendarDays(this.calendar, yk, m.key, this.calLocale);
+        if (cells.length) {
+          const id = `${cells[0].greg.getFullYear()}-${cells[0].greg.getMonth()}`;
+          if (id !== curGregId) return { yearKey: yk, monthKey: m.key };
+        }
+      }
+    }
+
+    return null;
+  }
+
   private stepMonth(delta: number) {
     const oldDay = this.currentFocusDay();
-    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
-    const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-    const mi = months.findIndex((m) => m.key === this.viewMonthKey);
-    const next = mi + delta;
-    if (next >= 0 && next < months.length) {
-      this.viewMonthKey = months[next].key;
-    } else {
-      // 跨年：先定位年份，再取该年首/末月
-      const yi = years.findIndex((y) => y.key === this.viewYearKey) + delta;
-      if (yi < 0 || yi >= years.length) return;
-      this.viewYearKey = years[yi].key;
-      const nm = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-      this.viewMonthKey = delta > 0 ? nm[0].key : nm[nm.length - 1].key;
-    }
+    const next = this.findAdjacentMonth(delta);
+    if (!next) return;
+    this.viewYearKey = next.yearKey;
+    this.viewMonthKey = next.monthKey;
     this.reseatFocusAfterViewChange(oldDay);
     this.requestUpdate();
   }
@@ -508,35 +552,26 @@ export class DateCalendar extends LitElement {
     this.requestUpdate();
   }
 
-  /** 取得相对当前视图偏移 delta（±1）个月的年/月键；越界（年份选项外）返回 null */
+  /** 取得相对当前视图偏移 delta（±1）个月的年/月键；越界或映射到同一公历月时返回 null */
   private adjacentMonthKeys(delta: number): { yearKey: string; monthKey: string } | null {
-    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
-    const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-    const mi = months.findIndex((m) => m.key === this.viewMonthKey);
-    const next = mi + delta;
-    if (next >= 0 && next < months.length) {
-      return { yearKey: this.viewYearKey, monthKey: months[next].key };
-    }
-    const yi = years.findIndex((y) => y.key === this.viewYearKey) + delta;
-    if (yi < 0 || yi >= years.length) return null;
-    const ny = years[yi].key;
-    const nm = monthOptions(this.calendar, ny, this.calLocale);
-    return { yearKey: ny, monthKey: delta > 0 ? nm[0].key : nm[nm.length - 1].key };
+    return this.findAdjacentMonth(delta);
   }
 
   private jumpToday() {
-    const sel = keysFromGregorian(new Date(), this.calendar);
+    const now = new Date();
+    const sel = startOfMonthKeys(now, this.calendar);
     this.viewYearKey = sel.yearKey;
     this.viewMonthKey = sel.monthKey;
-    this.focusKey = toISO(new Date());
+    this.focusKey = toISO(now);
     this.viewMode = 'days';
     this.requestUpdate();
   }
 
   /** 把焦点（可能跨月）移到某公历日期对应的日格 */
   private setFocusDate(d: Date) {
-    const k = keysFromGregorian(d, this.calendar);
-    if (k.yearKey !== this.viewYearKey || k.monthKey !== this.viewMonthKey) {
+    // 月份归属由月首决定（日本和历月中改元时逐日 yearKey 不同，但同属一个月）
+    if (!sameCalendarMonth(d, this.viewRefDate, this.calendar)) {
+      const k = startOfMonthKeys(d, this.calendar);
       this.viewYearKey = k.yearKey;
       this.viewMonthKey = k.monthKey;
     }
@@ -603,24 +638,17 @@ export class DateCalendar extends LitElement {
   private effectiveFocusKey(cells: CalDayCell[]): string {
     if (this.focusKey && cells.some((c) => toISO(c.greg) === this.focusKey)) return this.focusKey;
     const sel = fromISO(this.value);
-    if (sel) {
+    if (sel && sameCalendarMonth(sel, this.viewRefDate, this.calendar)) {
       const sk = keysFromGregorian(sel, this.calendar);
-      const hit = cells.find(
-        (c) =>
-          c.dayKey === sk.dayKey &&
-          this.viewYearKey === sk.yearKey &&
-          this.viewMonthKey === sk.monthKey
-      );
+      const hit = cells.find((c) => c.dayKey === sk.dayKey);
       if (hit) return toISO(hit.greg);
     }
-    const tk = keysFromGregorian(new Date(), this.calendar);
-    const th = cells.find(
-      (c) =>
-        c.dayKey === tk.dayKey &&
-        this.viewYearKey === tk.yearKey &&
-        this.viewMonthKey === tk.monthKey
-    );
-    if (th) return toISO(th.greg);
+    const now = new Date();
+    if (sameCalendarMonth(now, this.viewRefDate, this.calendar)) {
+      const tk = keysFromGregorian(now, this.calendar);
+      const th = cells.find((c) => c.dayKey === tk.dayKey);
+      if (th) return toISO(th.greg);
+    }
     return cells[0] ? toISO(cells[0].greg) : '';
   }
 
@@ -777,8 +805,9 @@ export class DateCalendar extends LitElement {
   /** 渲染月份选择视图 */
   private renderMonthView() {
     const months = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-    const todayMonthKey = keysFromGregorian(new Date(), this.calendar).monthKey;
     const selMonthKey = this.viewMonthKey;
+    const todayKeys = startOfMonthKeys(new Date(), this.calendar);
+    const isTodayYear = todayKeys.yearKey === this.viewYearKey;
 
     return html`
       <div
@@ -793,7 +822,7 @@ export class DateCalendar extends LitElement {
         <div class="month-grid">
           ${months.map((m) => {
             const isSel = m.key === selMonthKey;
-            const isCur = m.key === todayMonthKey && this.viewYearKey === keysFromGregorian(new Date(), this.calendar).yearKey;
+            const isCur = isTodayYear && m.key === todayKeys.monthKey;
             return html`
               <button
                 class="month-cell ${isSel ? 'selected' : ''} ${isCur ? 'current' : ''}"
@@ -903,8 +932,20 @@ export class DateCalendar extends LitElement {
     // 拆分表头为年份和月份两部分，分别可点击
     const yearOpts = yearOptions(this.calendar, this.refDate, this.calLocale);
     const monthOpts = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-    const yearDisplay = yearOpts.find((y) => y.key === this.viewYearKey)?.display ?? this.viewYearKey;
-    const monthDisplay = monthOpts.find((m) => m.key === this.viewMonthKey)?.display ?? this.viewMonthKey;
+    // 日本和历月中改元时，焦点日可能属于与月首不同的年号年。
+    // 表头跟随焦点日（或选中日）的真实年号，而非固定用 viewYearKey。
+    const focusDate = fromISO(fk) ?? fromISO(this.value);
+    const headerYearKey = focusDate && this.calendar === 'japanese'
+      ? keysFromGregorian(focusDate, this.calendar).yearKey
+      : this.viewYearKey;
+    const headerMonthKey = focusDate && this.calendar === 'japanese'
+      ? keysFromGregorian(focusDate, this.calendar).monthKey
+      : this.viewMonthKey;
+    const yearDisplay = yearOpts.find((y) => y.key === headerYearKey)?.display
+      ?? formatYearMonthHeader(this.calendar, headerYearKey, headerMonthKey, this.calLocale);
+    const monthDisplay = monthOpts.find((m) => m.key === headerMonthKey)?.display
+      ?? monthOptions(this.calendar, headerYearKey, this.calLocale).find((m) => m.key === headerMonthKey)?.display
+      ?? this.viewMonthKey;
 
     return html`
       <div class="picker">
@@ -967,11 +1008,7 @@ export class DateCalendar extends LitElement {
     fk: string,
     headerLabel: string
   ) {
-    const isSel =
-      valDate != null &&
-      c.greg.getFullYear() === valDate.getFullYear() &&
-      c.greg.getMonth() === valDate.getMonth() &&
-      c.greg.getDate() === valDate.getDate();
+    const isSel = valDate != null && toISO(c.greg) === toISO(valDate);
     const isToday =
       c.greg.getFullYear() === now.getFullYear() &&
       c.greg.getMonth() === now.getMonth() &&
