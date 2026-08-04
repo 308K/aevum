@@ -38,7 +38,7 @@ export const zhCN = {
   calPrevMonth: '上个月',
   calNextMonth: '下个月',
   calToday: '今天',
-  calKeyboardHint: '使用方向键在日期间移动，PageUp 与 PageDown 切换月份，Home 与 End 切换年份，回车或空格选择日期。',
+  calKeyboardHint: '使用方向键在日期间移动，PageUp与PageDown切换月份，Home与End切换年份，回车或空格选择日期。',
   calSelectYear: '选择年份',
   calSelectMonth: '选择月份',
   calYearViewHint: '点击年份快速跳转',
@@ -51,9 +51,9 @@ export const zhCN = {
   recurWeekly: '每周循环',
   recurMonthly: '每月循环',
   recurYearly: '每年循环',
-  recurSummaryWeekly: '每周 {weekday}',
-  recurSummaryMonthly: '每月 {day} 日',
-  recurSummaryYearly: '每年 {date}',
+  recurSummaryWeekly: '每周{weekday}',
+  recurSummaryMonthly: '每月{day}日',
+  recurSummaryYearly: '每年{date}',
   recurHint: '循环事件按规则自动滚动到下一个相同日期继续倒数：每周同一天、每月同日、每年同月同日。',
   fieldTags: '分类 / 标签',
   fieldPinned: '置顶显示',
@@ -76,7 +76,7 @@ export const zhCN = {
   calBuddhist: '佛教历',
   calJapanese: '日本和历',
 
-  // 历法纪元名（用于覆盖 Android Chrome 被裁剪 ICU 的错误 era）
+  // 历法纪元名（用于覆盖Android Chrome被裁剪ICU的错误era）
   eraIslamic: '伊斯兰历',
   eraHebrew: '希伯来历',
   eraPersian: '波斯历',
@@ -148,11 +148,11 @@ export const zhCN = {
   dataImport: '导入备份',
   dataHint: '导出全部事件与设置为JSON文件；导入将覆盖当前所有事件',
   toastExported: '已导出备份文件',
-  toastImported: '已导入 {count} 个事件',
+  toastImported: '已导入{count}个事件',
   toastImportFailed: '导入失败：文件格式无效',
   settingsBgImage: '卡片背景图',
   settingsBgImageHint: '上传图片作为该事件卡片的背景，自动压暗以保证文字可读',
-  settingsBgImageDropHint: '点击上传、拖拽图片到此处，或 Ctrl+V 粘贴剪贴板图片',
+  settingsBgImageDropHint: '点击上传、拖拽图片到此处，或Ctrl+V粘贴剪贴板图片',
   actionUpload: '上传图片',
   actionClear: '清除',
   toastBgSet: '背景图已更新',
@@ -160,7 +160,7 @@ export const zhCN = {
   toastBgTooLarge: '图片过大，请选择10MB以内的图片',
   toastBgNotImage: '不是有效的图片',
   actionPaste: '粘贴图片',
-  toastPasteUnsupported: '当前环境不支持读取剪贴板，请用 Ctrl+V 粘贴',
+  toastPasteUnsupported: '当前环境不支持读取剪贴板，请用Ctrl+V粘贴',
   toastPasteNoImage: '剪贴板中没有图片',
 
   // 分享
