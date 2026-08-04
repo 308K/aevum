@@ -15,6 +15,7 @@ export class TimeDisplay extends LitElement {
   static styles = css`
     :host {
       display: block;
+      text-autospace: normal;
     }
     .status {
       font-size: 0.85rem;

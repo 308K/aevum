@@ -80,6 +80,7 @@ export class DateCalendar extends LitElement {
   static styles = css`
     :host {
       display: block;
+      text-autospace: normal;
     }
     .picker {
       border: 1px solid var(--md-sys-color-outline-variant);

@@ -67,6 +67,7 @@ export class EditPage extends LitElement {
   static styles = css`
     :host {
       display: block;
+      text-autospace: normal;
     }
     form {
       display: flex;

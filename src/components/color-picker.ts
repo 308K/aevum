@@ -75,6 +75,7 @@ export class ColorPicker extends LitElement {
     :host {
       display: inline-block;
       position: relative;
+      text-autospace: normal;
     }
     .trigger {
       width: 100%;

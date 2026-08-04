@@ -24,6 +24,7 @@ export class EventCard extends LitElement {
   static styles = css`
     :host {
       display: block;
+      text-autospace: normal;
     }
     .card {
       position: relative;

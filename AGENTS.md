@@ -17,7 +17,7 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 - **所有可见 UI 文案**必须经 `t(key)` 走 i18n，字典在 `src/locales/{zh-CN,en-US}.ts`，新语言须在此新增文件并注册到 `src/i18n.ts` 的 `DICTS` —— 禁止在组件里硬编码可见字符串。
 - 图标统一用 `src/icons.ts` 内的内联 SVG（`icon()` 函数），禁止 emoji 字形或外部图标字体。
 - 主题色由用户种子色经 `@material/material-color-utilities` 动态生成完整 M3 色阶，配 OKLCH 渐变背景；禁止硬编码色值覆盖动态主题。
-- 全局样式在 `src/styles/global.css`，统一 `text-autospace: normal`。
+- 全局样式在 `src/styles/global.css`，统一 `text-autospace: normal`。**中西文间距由 CSS `text-autospace` 自动处理，源码中禁止手动在中西文（含中文与占位符 `{...}` 之间、中文与数字/英文之间）添加空格**——浏览器会在 CJK 与拉丁文/数字边界自动插入排版间距。
 
 ## Architecture
 入口 `index.html` → `src/main.ts`（启动引导 + 注册 PWA）→ `src/app.ts`（`AevumApp` 根组件，按路由在 `home-page` / `edit-page` / `settings-page` 间切换）。
@@ -31,6 +31,7 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 - 持久化只用 `localStorage`，键名统一 `aevum.*.v1`（events / settings / tags）；新增存储须「先读后写」并经对应 `on*Change` 通知订阅者，否则 UI 不刷新。
 - 组件使用 Lit 装饰器，**必须保持 `tsconfig.json`：`experimentalDecorators: true` 且 `useDefineForClassFields: false`**，否则 `@property` 会在子类字段初始化时被覆盖而失效。
 - 历法与时间计算**一律走 TC39 Temporal API**（通过 `src/utils/temporal.ts` 桥接），禁止引入重型日期库（date-fns / moment / dayjs 等）。展示格式化可继续使用 `Intl.DateTimeFormat`。
+- **中西文间距由 CSS 自动处理**（`text-autospace: normal`），**禁止在源码中手动添加空格**——包括中文与英文之间、中文与数字之间、中文与 i18n 占位符 `{...}` 之间。所有可见文案（i18n 字典值、组件模板内联文本）均不得包含手动中西文间距空格。
 
 ## Security considerations
 纯前端、无后端、无账号、无网络请求、无密钥/凭证、无遥测。全部用户数据仅存于浏览器 `localStorage`。唯一的外部输入是「导入备份」（`src/utils/backup.ts` 的 `importBackup`）：解析用户提供的 JSON 文件，须做结构校验、**禁止 `eval`/`Function`、禁止把字段直接当 HTML 注入 DOM**。分享图导出为客户端 canvas，不离开设备。

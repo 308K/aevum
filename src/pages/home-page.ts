@@ -20,6 +20,7 @@ export class HomePage extends LitElement {
   static styles = css`
     :host {
       display: block;
+      text-autospace: normal;
     }
     .filterbar {
       display: flex;

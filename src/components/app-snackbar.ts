@@ -18,6 +18,7 @@ export class AppSnackbar extends LitElement {
     :host {
       position: fixed;
       left: 50%;
+      text-autospace: normal;
       bottom: calc(96px + env(safe-area-inset-bottom, 0px));
       transform: translateX(-50%);
       z-index: 100;

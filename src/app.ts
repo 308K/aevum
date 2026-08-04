@@ -33,6 +33,7 @@ export class AevumApp extends LitElement {
     :host {
       display: block;
       min-height: 100vh;
+      text-autospace: normal;
     }
     .topbar {
       position: sticky;

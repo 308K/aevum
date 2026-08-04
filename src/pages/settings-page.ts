@@ -72,6 +72,7 @@ export class SettingsPage extends LitElement {
   static styles = css`
     :host {
       display: block;
+      text-autospace: normal;
     }
     .group {
       margin-bottom: 8px;
