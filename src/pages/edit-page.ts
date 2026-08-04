@@ -627,7 +627,7 @@ export class EditPage extends LitElement {
                 <span slot="icon" style="display:inline-flex">${icon('upload', 18)}</span>${t('actionUpload')}
               </md-outlined-button>
               <md-outlined-button type="button" @click=${this.onPasteButtonClick}>
-                <span slot="icon" style="display:inline-flex">${icon('contentCopy', 18)}</span>${t('actionPaste')}
+                <span slot="icon" style="display:inline-flex">${icon('contentPaste', 18)}</span>${t('actionPaste')}
               </md-outlined-button>
               ${this.bgImage
                 ? html`<md-text-button type="button" @click=${this.onBgClear}>${t('actionClear')}</md-text-button>`
