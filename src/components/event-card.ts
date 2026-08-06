@@ -4,7 +4,7 @@
 import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { AevumEvent, Recurrence } from '../types.js';
-import { formatEventDate } from '../utils/calendar.js';
+import { formatEventDate, weekdaySuffix } from '../utils/calendar.js';
 import { effectiveEvent, parseBoundary } from '../utils/time-calc.js';
 import { getSettings } from '../store/settings.js';
 import { resolveEventTags, tagDisplay } from '../store/tags.js';
@@ -181,6 +181,13 @@ export class EventCard extends LitElement {
   render() {
     const ev = effectiveEvent(this.event, Date.now(), parseBoundary(getSettings().dayBoundary));
     const recurring = ev.recurrence && ev.recurrence !== 'none';
+    const dateLine = [
+      formatEventDate(ev.date, ev.calendar, getLocale()),
+      weekdaySuffix(ev.date, getLocale(), getSettings().weekdayDisplay),
+      ev.time,
+    ]
+      .filter(Boolean)
+      .join(' ');
     return html`
       <div
         class="card"
@@ -202,7 +209,7 @@ export class EventCard extends LitElement {
               </h3>
               <div class="date">
                 ${recurring ? html`<span class="recur" title=${t(REC_I18N_KEYS[ev.recurrence!])}>${icon('repeat', 14)}</span>` : null}
-                ${formatEventDate(ev.date, ev.calendar, getLocale())}${ev.time ? ` ${ev.time}` : ''}
+                ${dateLine}
               </div>
             </div>
           </div>

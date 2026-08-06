@@ -11,9 +11,9 @@ import '@material/web/button/outlined-button.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/slider/slider.js';
 import type { MdOutlinedSelect } from '@material/web/select/outlined-select.js';
-import type { AevumEvent } from '../types.js';
+import type { AevumEvent, WeekdayDisplay } from '../types.js';
 import { getEvents, getEvent, onEventsChange, sortedEvents } from '../store/events.js';
-import { getSettings, PRESET_SEED_COLORS } from '../store/settings.js';
+import { getSettings, updateSettings, PRESET_SEED_COLORS } from '../store/settings.js';
 import { onLocaleChange, t } from '../i18n.js';
 import { icon } from '../icons.js';
 import { resolveDark } from '../theme.js';
@@ -232,6 +232,7 @@ export class ShareImagePage extends LitElement {
   @state() private cardOpacity = 0.5;
   @state() private saving = false;
   @state() private copying = false;
+  @state() private weekday: WeekdayDisplay = getSettings().shareWeekdayDisplay;
 
   @query('#preview') private previewCanvas!: HTMLCanvasElement;
 
@@ -264,7 +265,8 @@ export class ShareImagePage extends LitElement {
       changed.has('dark') ||
       changed.has('cardStyle') ||
       changed.has('cardIntensity') ||
-      changed.has('cardOpacity')
+      changed.has('cardOpacity') ||
+      changed.has('weekday')
     ) {
       this.renderPreview();
     }
@@ -278,6 +280,7 @@ export class ShareImagePage extends LitElement {
       cardIntensity: this.cardIntensity,
       cardOpacity: this.cardOpacity,
       darkenBg: false,
+      weekday: this.weekday,
     };
   }
 
@@ -316,6 +319,13 @@ export class ShareImagePage extends LitElement {
 
   private onColorChange(e: CustomEvent<{ value: string }>) {
     this.seedColor = e.detail.value;
+  }
+
+  private onWeekdayChange(e: Event) {
+    const v = (e.target as MdOutlinedSelect).value as WeekdayDisplay;
+    this.weekday = v;
+    // 持久化到全局设置，使其作为「分享图」独立的星期显示设置
+    updateSettings({ shareWeekdayDisplay: v });
   }
 
   private onPreset(e: MouseEvent) {
@@ -441,6 +451,23 @@ export class ShareImagePage extends LitElement {
                       >
                       <md-select-option value="blur"
                         ><div slot="headline">${t('shareImageCardBlur')}</div></md-select-option
+                      >
+                    </md-outlined-select>
+                  </div>
+                </div>
+
+                <div class="item">
+                  <div class="label">${t('shareImageWeekday')}</div>
+                  <div class="control">
+                    <md-outlined-select .value=${this.weekday} @change=${this.onWeekdayChange}>
+                      <md-select-option value="off"
+                        ><div slot="headline">${t('weekdayOff')}</div></md-select-option
+                      >
+                      <md-select-option value="short"
+                        ><div slot="headline">${t('weekdayShort')}</div></md-select-option
+                      >
+                      <md-select-option value="long"
+                        ><div slot="headline">${t('weekdayLong')}</div></md-select-option
                       >
                     </md-outlined-select>
                   </div>

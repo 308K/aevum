@@ -77,6 +77,9 @@ export type LocalePref = 'system' | 'zh-CN' | 'en-US';
 /** 日历周起始日（目标日期选择器）；'locale' 表示跟随语言/地区习惯 */
 export type WeekStart = 'locale' | 'sunday' | 'monday' | 'saturday';
 
+/** 星期显示模式：关闭 / 短（周四 / Thu）/ 长（星期四 / Thursday） */
+export type WeekdayDisplay = 'off' | 'short' | 'long';
+
 /** 全局设置 */
 export interface AevumSettings {
   locale: LocalePref;
@@ -93,6 +96,10 @@ export interface AevumSettings {
   defaultGranularity: Granularity;
   /** 日历周起始日（目标日期选择器）；'locale' 表示跟随语言/地区习惯 */
   weekStart: WeekStart;
+  /** 星期显示：关闭 / 短 / 长（影响首页卡片与事件详情，不影响分享图） */
+  weekdayDisplay: WeekdayDisplay;
+  /** 分享图页独立的星期显示设置（与全局 weekdayDisplay 解耦） */
+  shareWeekdayDisplay: WeekdayDisplay;
 }
 
 export const DEFAULT_SETTINGS: AevumSettings = {
@@ -105,6 +112,8 @@ export const DEFAULT_SETTINGS: AevumSettings = {
   defaultCalendar: 'gregory',
   defaultGranularity: 'day',
   weekStart: 'locale',
+  weekdayDisplay: 'long',
+  shareWeekdayDisplay: 'long',
 };
 
 /** 预设标签（颜色区分） */

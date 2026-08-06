@@ -12,7 +12,7 @@ import '@material/web/button/outlined-button.js';
 import '@material/web/iconbutton/icon-button.js';
 import type { AevumEvent, Recurrence } from '../types.js';
 import { getEvent, deleteEvent } from '../store/events.js';
-import { formatEventDateTime } from '../utils/calendar.js';
+import { formatEventDateTime, weekdaySuffix } from '../utils/calendar.js';
 import { effectiveEvent } from '../utils/time-calc.js';
 import { parseBoundary } from '../utils/time-calc.js';
 import { getSettings } from '../store/settings.js';
@@ -224,6 +224,14 @@ export class EventDetail extends LitElement {
     const locale = getLocale();
     const eff = ev ? effectiveEvent(ev, Date.now(), parseBoundary(getSettings().dayBoundary)) : undefined;
     const recurring = ev?.recurrence && ev.recurrence !== 'none';
+    const dateLine = ev && eff
+      ? [
+          formatEventDateTime(eff.date, eff.time, eff.calendar, locale),
+          weekdaySuffix(eff.date, locale, getSettings().weekdayDisplay),
+        ]
+          .filter(Boolean)
+          .join(' ')
+      : '';
     return html`
       <md-dialog id="detailDialog">
         <div slot="headline" class="dialog-head">
@@ -242,7 +250,7 @@ export class EventDetail extends LitElement {
                     : null}
                   <div class="hero-inner">
                     <div class="date">
-                      ${formatEventDateTime(eff.date, eff.time, eff.calendar, locale)}
+                      ${dateLine}
                     </div>
                     <time-display large .event=${eff}></time-display>
                     ${resolveEventTags(ev).length

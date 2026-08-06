@@ -2,11 +2,11 @@
  * 事件分享卡片：Canvas 2D 手绘 PNG（不依赖 DOM 截图，Shadow DOM 兼容）
  * 配色由「种子色 + 亮暗」独立派生（不依赖当前页面主题），支持自定义背景图与不压暗、卡片覆盖（不透明/半透明/高斯模糊）
  */
-import type { AevumEvent } from '../types.js';
+import type { AevumEvent, WeekdayDisplay } from '../types.js';
 import { getSettings } from '../store/settings.js';
 import { computeDiff, parseBoundary, effectiveEvent } from './time-calc.js';
 import { formatSegments, statusLabel } from './format.js';
-import { formatEventDateTime } from './calendar.js';
+import { formatEventDateTime, weekdaySuffix } from './calendar.js';
 import { resolveEventTags, tagDisplay } from '../store/tags.js';
 import { getLocale, t } from '../i18n.js';
 import { getSchemeColors, resolveDark } from '../theme.js';
@@ -34,6 +34,8 @@ export interface ShareImageOptions {
   cardOpacity: number;
   /** 是否压暗背景图（默认 false：保留背景图原色，靠卡片覆盖保证可读） */
   darkenBg: boolean;
+  /** 星期显示：关闭 / 短 / 长（分享图页可独立设置） */
+  weekday: WeekdayDisplay;
 }
 
 interface SchemeColors {
@@ -150,6 +152,7 @@ function normalizeOptions(opts?: Partial<ShareImageOptions>): ShareImageOptions 
     cardIntensity: opts?.cardIntensity ?? 0.5,
     cardOpacity: opts?.cardOpacity ?? 0.5,
     darkenBg: opts?.darkenBg ?? false,
+    weekday: opts?.weekday ?? s.shareWeekdayDisplay,
   };
 }
 
@@ -313,7 +316,13 @@ export async function drawShareImage(
   const dateY = nameY + 76;
   ctx.font = `400 40px ${FONT}`;
   ctx.fillStyle = colors.onSurfaceVariant;
-  ctx.fillText(formatEventDateTime(eff.date, eff.time, eff.calendar, getLocale()), cx, dateY);
+  const dateText = [
+    formatEventDateTime(eff.date, eff.time, eff.calendar, getLocale()),
+    weekdaySuffix(eff.date, getLocale(), options.weekday),
+  ]
+    .filter(Boolean)
+    .join(' ');
+  ctx.fillText(dateText, cx, dateY);
 
   // —— 标签胶囊 ——
   const tagDefs = resolveEventTags(ev);

@@ -132,6 +132,11 @@ export const enUS: LocaleDict = {
   weekStartSunday: 'Sunday',
   weekStartMonday: 'Monday',
   weekStartSaturday: 'Saturday',
+  settingsWeekdayDisplay: 'Weekday display',
+  settingsWeekdayDisplayHint: 'How the weekday is shown after the date on event cards and details',
+  weekdayOff: 'Off',
+  weekdayShort: 'Short (Thu)',
+  weekdayLong: 'Long (Thursday)',
 
   // Data & background
   settingsSectionData: 'Data',
@@ -175,6 +180,7 @@ export const enUS: LocaleDict = {
   shareImageCardOpaque: 'Opaque',
   shareImageCardTranslucent: 'Translucent',
   shareImageCardBlur: 'Blur',
+  shareImageWeekday: 'Weekday',
   shareImageOpacity: 'Opacity',
   shareImageBlurAmount: 'Blur amount',
   shareImageCoverOpacity: 'Cover opacity',

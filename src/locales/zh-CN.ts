@@ -141,6 +141,11 @@ export const zhCN = {
   weekStartSunday: '周日',
   weekStartMonday: '周一',
   weekStartSaturday: '周六',
+  settingsWeekdayDisplay: '星期显示',
+  settingsWeekdayDisplayHint: '控制首页卡片与事件详情中，日期后所显示的星期',
+  weekdayOff: '关闭',
+  weekdayShort: '短（周四）',
+  weekdayLong: '长（星期四）',
 
   // 数据与背景
   settingsSectionData: '数据',
@@ -184,6 +189,7 @@ export const zhCN = {
   shareImageCardOpaque: '不透明',
   shareImageCardTranslucent: '半透明',
   shareImageCardBlur: '高斯模糊',
+  shareImageWeekday: '星期显示',
   shareImageOpacity: '透明度',
   shareImageBlurAmount: '模糊程度',
   shareImageCoverOpacity: '覆盖浓度',

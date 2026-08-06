@@ -9,7 +9,7 @@
 import { Temporal, getTemporalForCalendar } from './temporal.js';
 import { tIn, getLocale, type Locale } from '../i18n.js';
 import type { LocaleDict } from '../locales/zh-CN.js';
-import type { CalendarId } from '../types.js';
+import type { CalendarId, WeekdayDisplay } from '../types.js';
 
 export const CALENDAR_IDS: CalendarId[] = [
   'gregory',
@@ -794,6 +794,31 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
 export function formatEventDateTime(dateISO: string, time: string | undefined, cal: CalendarId, displayLocale: string): string {
   const base = formatEventDate(dateISO, cal, displayLocale);
   return time ? `${base} ${time}` : base;
+}
+
+/** 星期显示粒度（短：周四 / Thu；长：星期四 / Thursday） */
+export type WeekdayMode = 'short' | 'long';
+
+/**
+ * 目标日期对应的本地化星期名（如中文「星期四」、英文「Thursday」）。
+ * 星期仅与公历日期相关，与事件所选历法无关，故直接由公历 ISO 计算。
+ * 用于事件卡片 / 分享图在日期后附加星期。mode 默认为 'long'（保持向后兼容）。
+ */
+export function formatWeekday(dateISO: string, displayLocale: string, mode: WeekdayMode = 'long'): string {
+  const [y, m, d] = dateISO.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  if (Number.isNaN(date.getTime())) return '';
+  // 复用 fmt 的 Intl 缓存，weekday 给出本地化星期名（短 / 长）
+  return fmt(displayLocale, 'gregory', { weekday: mode }).format(date);
+}
+
+/**
+ * 根据设置项 'off'|'short'|'long' 返回要追加在日期后的星期串。
+ * 'off' 返回空串（不显示），其余透传给 formatWeekday。
+ */
+export function weekdaySuffix(dateISO: string, displayLocale: string, mode: WeekdayDisplay): string {
+  if (mode === 'off') return '';
+  return formatWeekday(dateISO, displayLocale, mode);
 }
 
 /**

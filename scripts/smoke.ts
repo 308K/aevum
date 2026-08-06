@@ -5,6 +5,8 @@ await ensureTemporalReady();
 
 import {
   formatEventDate,
+  formatWeekday,
+  weekdaySuffix,
   formatYearMonthHeader,
   keysFromGregorian,
   gregorianFromKeys,
@@ -212,6 +214,21 @@ const cnHeader = formatYearMonthHeader('chinese', '2026|丙午', '正月', 'zh-C
 check('农历表头含干支与月名', cnHeader.includes('丙午') && cnHeader.includes('正月'), true);
 // 英文回退到 Intl 标准「月 年」格式（不含多余数字月）
 check('英文表头含 August', formatYearMonthHeader('gregory', '2026', '8', 'en-US').includes('August'), true);
+
+console.log('== 6. 日期后的星期名（本地化）==');
+// 2024-01-01 周一；2024-01-07 周日
+check('2024-01-01 中文星期一', formatWeekday('2024-01-01', 'zh-CN'), '星期一');
+check('2024-01-01 英文 Monday', formatWeekday('2024-01-01', 'en-US'), 'Monday');
+check('2024-01-07 中文星期日', formatWeekday('2024-01-07', 'zh-CN'), '星期日');
+check('2024-01-07 英文 Sunday', formatWeekday('2024-01-07', 'en-US'), 'Sunday');
+check('非法日期返回空串', formatWeekday('not-a-date', 'zh-CN'), '');
+// 短模式（中文「周四」/ 英文「Thu」）
+check('2024-01-04 中文短周四', formatWeekday('2024-01-04', 'zh-CN', 'short'), '周四');
+check('2024-01-04 英文短 Thu', formatWeekday('2024-01-04', 'en-US', 'short'), 'Thu');
+// weekdaySuffix 按设置项 'off'|'short'|'long' 拼串
+check('weekdaySuffix off 返回空串', weekdaySuffix('2024-01-04', 'zh-CN', 'off'), '');
+check('weekdaySuffix short 返回周四', weekdaySuffix('2024-01-04', 'zh-CN', 'short'), '周四');
+check('weekdaySuffix long 返回星期四', weekdaySuffix('2024-01-04', 'zh-CN', 'long'), '星期四');
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
 process.exit(fail ? 1 : 0);

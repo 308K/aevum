@@ -25,6 +25,7 @@ import type {
   LocalePref,
   ThemeMode,
   WeekStart,
+  WeekdayDisplay,
 } from '../types.js';
 import { getSettings, onSettingsChange, updateSettings, PRESET_SEED_COLORS } from '../store/settings.js';
 import {
@@ -65,6 +66,12 @@ const WEEKSTART_I18N_KEYS: Record<WeekStart, 'weekStartLocale' | 'weekStartSunda
   sunday: 'weekStartSunday',
   monday: 'weekStartMonday',
   saturday: 'weekStartSaturday',
+};
+
+const WEEKDAY_I18N_KEYS: Record<WeekdayDisplay, 'weekdayOff' | 'weekdayShort' | 'weekdayLong'> = {
+  off: 'weekdayOff',
+  short: 'weekdayShort',
+  long: 'weekdayLong',
 };
 
 @customElement('settings-page')
@@ -637,6 +644,24 @@ export class SettingsPage extends LitElement {
                 ${(['locale', 'sunday', 'monday', 'saturday'] as WeekStart[]).map(
                   (w) => html`<md-select-option value=${w}>
                     <div slot="headline">${t(WEEKSTART_I18N_KEYS[w])}</div>
+                  </md-select-option>`
+                )}
+              </md-outlined-select>
+            </div>
+          </div>
+          <div class="item">
+            <div>
+              <div class="label">${t('settingsWeekdayDisplay')}</div>
+              <div class="hint">${t('settingsWeekdayDisplayHint')}</div>
+            </div>
+            <div class="control">
+              <md-outlined-select
+                .value=${s.weekdayDisplay}
+                @change=${(e: Event) => this.set('weekdayDisplay', (e.target as MdOutlinedSelect).value as WeekdayDisplay)}
+              >
+                ${(['off', 'short', 'long'] as WeekdayDisplay[]).map(
+                  (w) => html`<md-select-option value=${w}>
+                    <div slot="headline">${t(WEEKDAY_I18N_KEYS[w])}</div>
                   </md-select-option>`
                 )}
               </md-outlined-select>
