@@ -12,11 +12,20 @@
  * - 时间戳与公历日期的互转改用 Temporal.PlainDateTime / Temporal.Instant
  * - 逻辑日序号仍基于时间戳运算（因自定义日界限需要时间戳级精度）
  */
-import { Temporal } from './temporal.js';
-import type { AevumEvent, EventStatus, Granularity } from '../types.js';
+import { Temporal, getTemporalForCalendar } from './temporal.js';
+import type { AevumEvent, CalendarId, EventStatus, Granularity } from '../types.js';
 
 const MIN_MS = 60_000;
 const DAY_MS = 86_400_000;
+
+/**
+ * 应用层 CalendarId → Temporal 日历标识符。
+ * 与 src/utils/calendar.ts 的 temporalCalId 保持一致：'islamic' 在 Temporal 中不存在，
+ * 映射为 'islamic-umalqura'。
+ */
+function temporalCalId(cal: CalendarId): string {
+  return cal === 'islamic' ? 'islamic-umalqura' : cal;
+}
 
 export interface DiffParts {
   years?: number;
@@ -55,6 +64,12 @@ function fromDate(pd: Temporal.PlainDate): Date {
   return new Date(pd.year, pd.month - 1, pd.day);
 }
 
+/** 事件历法下的 Temporal.PlainDate → 公历 ISO（yyyy-mm-dd） */
+function isoFromCalDate(pd: Temporal.PlainDate): string {
+  const g = pd.withCalendar('gregory');
+  return isoOf(new Date(g.year, g.month - 1, g.day));
+}
+
 /**
  * 候选日期的「比较基准」：
  * - 精确时间事件 → 目标时间戳（与 nowTs 比较）
@@ -72,6 +87,10 @@ function candidateMoment(iso: string, time: string | undefined, boundaryMin: num
  * - 否则按 weekly/monthly/yearly 规则，找到 first occurrence ≥ 当前时刻（含今天）的日期
  *
  * 使用 Temporal.PlainDate 做日期算术（DST 安全、日历感知）。
+ * monthly/yearly 在「事件录入历法」（event.calendar）下推进：
+ * - monthly：每个历法月同日（目标日超出该月天数时收敛到月末）
+ * - yearly：每个历法年同月同日（目标月在该年不存在——如农历闰月——则跳过该年）
+ * weekly 与历法无关（星期是公历属性），始终按公历星期几推进。
  */
 export function nextOccurrenceDate(event: AevumEvent, nowTs: number, boundaryMin: number): string {
   const r = event.recurrence;
@@ -96,26 +115,52 @@ export function nextOccurrenceDate(event: AevumEvent, nowTs: number, boundaryMin
       if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
       cand = cand.add({ days: 7 });
     }
-  } else if (r === 'monthly') {
-    let cand = nowPd;
-    for (let i = 0; i < 13; i++) {
-      // 当月不存在该日则收敛到月末
-      const dim = cand.daysInMonth;
-      const day = Math.min(ad, dim);
-      const tryDate = Temporal.PlainDate.from({ year: cand.year, month: cand.month, day });
-      const iso = isoOf(fromDate(tryDate));
-      if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
-      cand = cand.add({ months: 1 });
-    }
-  } else if (r === 'yearly') {
-    let cand = nowPd;
-    for (let i = 0; i < 3; i++) {
-      const dim = Temporal.PlainDate.from({ year: cand.year, month: am, day: 1 }).daysInMonth;
-      const day = Math.min(ad, dim);
-      const tryDate = Temporal.PlainDate.from({ year: cand.year, month: am, day });
-      const iso = isoOf(fromDate(tryDate));
-      if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
-      cand = cand.add({ years: 1 });
+  } else if (r === 'monthly' || r === 'yearly') {
+    // 在事件历法下推进。用 getTemporalForCalendar 取得该历法的实现
+    // （Firefox 等原生禁用 islamic-umalqura 时自动回退 polyfill），
+    // 构造与转换均用同一实现，避免原生/ polyfill 混用。
+    const calId = temporalCalId(event.calendar);
+    const T = getTemporalForCalendar(calId);
+    const anchorCal = T.PlainDate.from({ year: ay, month: am, day: ad }).withCalendar(calId);
+    const anchorDay = anchorCal.day;
+    const anchorMonthCode = anchorCal.monthCode;
+    const nowCal = T.PlainDate.from({
+      year: now.getFullYear(),
+      month: now.getMonth() + 1,
+      day: now.getDate(),
+    }).withCalendar(calId);
+
+    if (r === 'monthly') {
+      // 从当前历法月起逐月推进：with({day}) 把候选日收敛到目标日
+      //（超出该月天数时约束到月末，与「每月最后一天」直觉一致）。
+      let cand = nowCal;
+      for (let i = 0; i < 13; i++) {
+        const iso = isoFromCalDate(cand.with({ day: anchorDay }));
+        if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+        cand = cand.add({ months: 1 });
+      }
+    } else {
+      // 从当前历法年起逐年推进：先定位该历法年首月（month === 1），
+      // 再在年内逐月枚举查找 anchor 月（monthCode 匹配，闰月仅在闰年出现），
+      // 找到后收敛到 anchor 日；该年无此月则跳过。
+      // 迭代覆盖 19 年闰月周期（同一闰月重现间隔最长可达 10+ 年）。
+      let cand = nowCal;
+      for (let i = 0; i < 24; i++) {
+        let yearStart = cand;
+        while (yearStart.month !== 1) yearStart = yearStart.subtract({ months: 1 });
+        yearStart = yearStart.with({ day: 1 });
+        let found: Temporal.PlainDate | null = null;
+        let pd = yearStart;
+        for (let m = 0; m < yearStart.monthsInYear; m++) {
+          if (pd.monthCode === anchorMonthCode) { found = pd; break; }
+          pd = pd.add({ months: 1 });
+        }
+        if (found) {
+          const iso = isoFromCalDate(found.with({ day: anchorDay }));
+          if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+        }
+        cand = yearStart.add({ years: 1 });
+      }
     }
   }
   return event.date;

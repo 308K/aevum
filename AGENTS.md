@@ -51,4 +51,5 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 - `bun scripts/smoke-themes.ts` —— 自定义主题色逻辑：增 / 删 / 改 / 同色去重 / 删当前色回退默认。
 - `bun scripts/smoke-dst.ts` —— DST 日进位回归。
 - `bun scripts/smoke-backup.ts` —— 备份导入清洗。
+- `bun scripts/smoke-recur.ts` —— 循环事件回归（日本和历改元边界：昭和 12 月起始 / 平成正月起始 / 令和年中起始，monthly/yearly/weekly/精确时间，约 18 条断言）。也可用 Deno 原生 Temporal 跑（`deno run --no-prompt --allow-read --allow-env scripts/smoke-recur.ts`）。
 修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑对应脚本。
