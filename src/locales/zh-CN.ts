@@ -147,6 +147,26 @@ export const zhCN = {
   weekdayShort: '短（周四）',
   weekdayLong: '长（星期四）',
 
+  // 循环事件策略
+  settingsRecurrenceStrategy: '循环事件策略',
+  settingsRecurrenceStrategyHint: '控制年循环或月循环在目标日不存在时的处理方式',
+  settingsSolarOverflow: '公历溢出处理',
+  settingsSolarOverflowHint: '年循环2月29日或月循环31日等不存在时如何处理',
+  solarOverflowRfc5545: '严格跳过（RFC 5545）',
+  solarOverflowRfc5545Desc: '平年跳过2月29日、不足31天的月跳过31日',
+  solarOverflowLastDay: '视为当月最后一日',
+  solarOverflowLastDayDesc: '平年2月28日代替2月29日、2月28日代替31日',
+  solarOverflowNextMonth: '顺延至次月1日',
+  solarOverflowNextMonthDesc: '平年3月1日代替2月29日、次月1日代替31日',
+  settingsLunarLeapStrategy: '农历闰月处理',
+  settingsLunarLeapStrategyHint: '锚定在农历闰月的年循环事件如何处理',
+  lunarLeapNonLeap: '从正不从闰',
+  lunarLeapNonLeapDesc: '以对应平月为准，闰月不额外提醒',
+  lunarLeapStrictLeap: '严格在闰月',
+  lunarLeapStrictLeapDesc: '仅在出现该闰月的年份提醒（可能间隔数年）',
+  lunarLeapBoth: '平月和闰月都提醒',
+  lunarLeapBothDesc: '对应平月提醒一次，出现闰月时再提醒一次',
+
   // 数据与背景
   settingsSectionData: '数据',
   dataExport: '导出备份',

@@ -80,6 +80,22 @@ export type WeekStart = 'locale' | 'sunday' | 'monday' | 'saturday';
 /** 星期显示模式：关闭 / 短（周四 / Thu）/ 长（星期四 / Thursday） */
 export type WeekdayDisplay = 'off' | 'short' | 'long';
 
+/**
+ * 公历日不存在时的溢出处理策略（年循环2月29日、月循环31日等）。
+ * - 'rfc5545'：严格跳过（RFC 5545 行为）
+ * - 'lastDay'：视为当月最后一日
+ * - 'nextMonth'：顺延至次月1日
+ */
+export type SolarOverflow = 'rfc5545' | 'lastDay' | 'nextMonth';
+
+/**
+ * 农历闰月循环事件策略（锚定在农历闰月的年循环）。
+ * - 'nonLeap'：从正不从闰（以对应平月为准）
+ * - 'strictLeap'：严格在闰月（该年无闰月则跳过）
+ * - 'both'：平月和闰月都提醒
+ */
+export type LunarLeapStrategy = 'nonLeap' | 'strictLeap' | 'both';
+
 /** 全局设置 */
 export interface AevumSettings {
   locale: LocalePref;
@@ -100,6 +116,10 @@ export interface AevumSettings {
   weekdayDisplay: WeekdayDisplay;
   /** 分享图页独立的星期显示设置（与全局 weekdayDisplay 解耦） */
   shareWeekdayDisplay: WeekdayDisplay;
+  /** 公历日不存在时的溢出策略（年循环2月29日、月循环31日） */
+  solarOverflow: SolarOverflow;
+  /** 农历闰月循环事件策略 */
+  lunarLeapStrategy: LunarLeapStrategy;
 }
 
 export const DEFAULT_SETTINGS: AevumSettings = {
@@ -114,6 +134,8 @@ export const DEFAULT_SETTINGS: AevumSettings = {
   weekStart: 'locale',
   weekdayDisplay: 'long',
   shareWeekdayDisplay: 'long',
+  solarOverflow: 'lastDay',
+  lunarLeapStrategy: 'nonLeap',
 };
 
 /** 预设标签（颜色区分） */
@@ -130,3 +152,34 @@ export const PRESET_TAGS: PresetTag[] = [
   { key: 'tagHoliday', color: '#6A5F00' },
   { key: 'tagStudy', color: '#3B608F' },
 ];
+
+/**
+ * 根据浏览器语言推断地区适用的 solarOverflow 默认策略。
+ * - 中国大陆、中国台湾 → 'lastDay'（平年2月28日等）
+ * - 英联邦国家、中国香港、中国澳门 → 'nextMonth'（顺延至次月1日）
+ * - 其他 → 'rfc5545'（严格跳过）
+ */
+export function defaultSolarOverflow(locale: string): SolarOverflow {
+  const l = locale.toLowerCase();
+  // 中国大陆 zh-CN, zh-Hans, zh-SG, zh-#Hans
+  // 中国台湾 zh-TW, zh-Hant
+  if (l.startsWith('zh') && (l.includes('tw') || l.includes('hk') || l.includes('mo'))) {
+    // 香港、澳门 → nextMonth
+    if (l.includes('hk') || l.includes('mo')) return 'nextMonth';
+    // 台湾 → lastDay
+    return 'lastDay';
+  }
+  if (l.startsWith('zh')) return 'lastDay';
+  // 英联邦国家（大致列表，主要识别 en-GB / en-AU / en-NZ / en-CA / en-IN / en-ZA / en-SG）
+  if (l.startsWith('en') && (l.includes('gb') || l.includes('au') || l.includes('nz') || l.includes('ca') || l.includes('in') || l.includes('za') || l.includes('sg'))) {
+    return 'nextMonth';
+  }
+  return 'rfc5545';
+}
+
+/**
+ * 农历闰月策略默认值。无论地区都默认 'nonLeap'。
+ */
+export function defaultLunarLeapStrategy(_locale: string): LunarLeapStrategy {
+  return 'nonLeap';
+}

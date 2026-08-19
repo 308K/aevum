@@ -13,7 +13,7 @@
  * - 逻辑日序号仍基于时间戳运算（因自定义日界限需要时间戳级精度）
  */
 import { Temporal, getTemporalForCalendar } from './temporal.js';
-import type { AevumEvent, CalendarId, EventStatus, Granularity } from '../types.js';
+import type { AevumEvent, CalendarId, EventStatus, Granularity, SolarOverflow, LunarLeapStrategy } from '../types.js';
 
 const MIN_MS = 60_000;
 const DAY_MS = 86_400_000;
@@ -25,6 +25,65 @@ const DAY_MS = 86_400_000;
  */
 function temporalCalId(cal: CalendarId): string {
   return cal === 'islamic' ? 'islamic-umalqura' : cal;
+}
+
+/**
+ * 循环事件策略选项（从全局设置传入）。
+ * - solarOverflow：公历日不存在时的溢出处理（年循环2月29日、月循环31日）
+ * - lunarLeapStrategy：农历闰月循环事件策略
+ */
+export interface RecurrenceStrategy {
+  solarOverflow: SolarOverflow;
+  lunarLeapStrategy: LunarLeapStrategy;
+}
+
+/**
+ * 判断公历月份的最大天数。
+ */
+function maxDayOfMonth(year: number, month: number): number {
+  return new Date(year, month, 0).getDate();
+}
+
+/**
+ * 应用 solar overflow 策略：当目标日超出该月天数时，按策略返回调整后的日期。
+ * - 'rfc5545'：返回 null（表示跳过该月/年）
+ * - 'lastDay'：返回该月最后一天
+ * - 'nextMonth'：返回次月1日
+ */
+function applySolarOverflow(
+  year: number,
+  month: number,
+  day: number,
+  strategy: SolarOverflow
+): { year: number; month: number; day: number } | null {
+  const maxDay = maxDayOfMonth(year, month);
+  if (day <= maxDay) return { year, month, day };
+  switch (strategy) {
+    case 'rfc5545':
+      return null;
+    case 'lastDay':
+      return { year, month, day: maxDay };
+    case 'nextMonth': {
+      const next = new Date(year, month, 1); // month is 1-based, new Date(year, month, 1) → next month's 1st
+      return { year: next.getFullYear(), month: next.getMonth() + 1, day: 1 };
+    }
+  }
+}
+
+/**
+ * 检查 monthCode 是否为闰月（农历/希伯来历等）。
+ * 闰月的 monthCode 形如 'M06L'（含 'L' 后缀）。
+ */
+function isLeapMonthCode(monthCode: string): boolean {
+  return monthCode.endsWith('L');
+}
+
+/**
+ * 从闰月 monthCode 提取对应的平月 monthCode（去掉 'L' 后缀）。
+ * 如 'M06L' → 'M06'。
+ */
+function nonLeapMonthCode(monthCode: string): string {
+  return monthCode.endsWith('L') ? monthCode.slice(0, -1) : monthCode;
 }
 
 export interface DiffParts {
@@ -88,11 +147,18 @@ function candidateMoment(iso: string, time: string | undefined, boundaryMin: num
  *
  * 使用 Temporal.PlainDate 做日期算术（DST 安全、日历感知）。
  * monthly/yearly 在「事件录入历法」（event.calendar）下推进：
- * - monthly：每个历法月同日（目标日超出该月天数时收敛到月末）
- * - yearly：每个历法年同月同日（目标月在该年不存在——如农历闰月——则跳过该年）
+ * - monthly：每个历法月同日（目标日超出该月天数时按 solarOverflow 策略处理）
+ * - yearly：每个历法年同月同日（目标月在该年不存在——如农历闰月——则按 lunarLeapStrategy 策略处理）
  * weekly 与历法无关（星期是公历属性），始终按公历星期几推进。
+ *
+ * @param strategy 循环策略（solarOverflow + lunarLeapStrategy），从全局设置传入
  */
-export function nextOccurrenceDate(event: AevumEvent, nowTs: number, boundaryMin: number): string {
+export function nextOccurrenceDate(
+  event: AevumEvent,
+  nowTs: number,
+  boundaryMin: number,
+  strategy: RecurrenceStrategy = { solarOverflow: 'lastDay', lunarLeapStrategy: 'nonLeap' }
+): string {
   const r = event.recurrence;
   if (!r || r === 'none') return event.date;
 
@@ -130,34 +196,104 @@ export function nextOccurrenceDate(event: AevumEvent, nowTs: number, boundaryMin
       day: now.getDate(),
     }).withCalendar(calId);
 
+    // 判断锚定是否在闰月（农历闰月 monthCode 含 'L' 后缀）
+    const anchorIsLeap = isLeapMonthCode(anchorMonthCode);
+
     if (r === 'monthly') {
-      // 从当前历法月起逐月推进：with({day}) 把候选日收敛到目标日
-      //（超出该月天数时约束到月末，与「每月最后一天」直觉一致）。
+      // 从当前历法月起逐月推进：with({day}) 把候选日收敛到目标日。
+      // 对于公历历法，当目标日超出该月天数时按 solarOverflow 策略处理：
+      // - 'rfc5545'：跳过该月（不产生候选）
+      // - 'lastDay'：收敛到月末（Temporal with({day}) 默认行为）
+      // - 'nextMonth'：顺延至次月1日
+      // 对于非公历历法（农历等），with({day}) 的 Temporal 行为已是收敛到月末，
+      // 语义等同于 'lastDay'，不做额外处理（非公历历法的日不存在场景罕见）。
       let cand = nowCal;
       for (let i = 0; i < 13; i++) {
-        const iso = isoFromCalDate(cand.with({ day: anchorDay }));
-        if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+        const maxDay = cand.daysInMonth;
+        if (event.calendar === 'gregory' && anchorDay > maxDay) {
+          // 公历日不存在场景：应用 solarOverflow 策略
+          const greg = cand.withCalendar('gregory');
+          const adjusted = applySolarOverflow(greg.year, greg.month, anchorDay, strategy.solarOverflow);
+          if (adjusted) {
+            const adjustedPd = T.PlainDate.from({
+              year: adjusted.year,
+              month: adjusted.month,
+              day: adjusted.day,
+            });
+            const iso = isoFromCalDate(adjustedPd);
+            if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+          }
+          // rfc5545 跳过该月
+        } else {
+          const iso = isoFromCalDate(cand.with({ day: anchorDay }));
+          if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+        }
         cand = cand.add({ months: 1 });
       }
     } else {
-      // 从当前历法年起逐年推进：先定位该历法年首月（month === 1），
-      // 再在年内逐月枚举查找 anchor 月（monthCode 匹配，闰月仅在闰年出现），
-      // 找到后收敛到 anchor 日；该年无此月则跳过。
-      // 迭代覆盖 19 年闰月周期（同一闰月重现间隔最长可达 10+ 年）。
+      // yearly：逐年推进，在年内枚举月份查找 anchor 月。
+      //
+      // 农历闰月策略（锚定在农历闰月时）：
+      // - 'nonLeap'：以对应平月为准（去掉 monthCode 的 'L' 后缀匹配）
+      // - 'strictLeap'：严格匹配闰月 monthCode（该年无此闰月则跳过）
+      // - 'both'：平月和闰月都匹配（平月先于闰月）
+      //
+      // 公历年循环2月29日不存在时：
+      // - solarOverflow 决定平年行为（跳过/月末/次月1日）
+      const targetMonthCodes: string[] = [];
+      if (anchorIsLeap) {
+        switch (strategy.lunarLeapStrategy) {
+          case 'nonLeap':
+            targetMonthCodes.push(nonLeapMonthCode(anchorMonthCode));
+            break;
+          case 'strictLeap':
+            targetMonthCodes.push(anchorMonthCode);
+            break;
+          case 'both':
+            targetMonthCodes.push(nonLeapMonthCode(anchorMonthCode));
+            targetMonthCodes.push(anchorMonthCode);
+            break;
+        }
+      } else {
+        targetMonthCodes.push(anchorMonthCode);
+      }
+
       let cand = nowCal;
       for (let i = 0; i < 24; i++) {
         let yearStart = cand;
         while (yearStart.month !== 1) yearStart = yearStart.subtract({ months: 1 });
         yearStart = yearStart.with({ day: 1 });
-        let found: Temporal.PlainDate | null = null;
+
+        // 收集该年所有匹配月份的候选
+        const candidates: Temporal.PlainDate[] = [];
         let pd = yearStart;
         for (let m = 0; m < yearStart.monthsInYear; m++) {
-          if (pd.monthCode === anchorMonthCode) { found = pd; break; }
+          if (targetMonthCodes.includes(pd.monthCode)) {
+            candidates.push(pd);
+          }
           pd = pd.add({ months: 1 });
         }
-        if (found) {
-          const iso = isoFromCalDate(found.with({ day: anchorDay }));
-          if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+
+        for (const found of candidates) {
+          // 公历2月29日场景：检查 anchorDay 是否超出该月天数
+          const maxDay = found.daysInMonth;
+          if (event.calendar === 'gregory' && anchorDay > maxDay) {
+            const greg = found.withCalendar('gregory');
+            const adjusted = applySolarOverflow(greg.year, greg.month, anchorDay, strategy.solarOverflow);
+            if (adjusted) {
+              const adjustedPd = T.PlainDate.from({
+                year: adjusted.year,
+                month: adjusted.month,
+                day: adjusted.day,
+              });
+              const iso = isoFromCalDate(adjustedPd);
+              if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+            }
+            // rfc5545 跳过
+          } else {
+            const iso = isoFromCalDate(found.with({ day: anchorDay }));
+            if (candidateMoment(iso, time, boundaryMin) >= refMoment) return iso;
+          }
         }
         cand = yearStart.add({ years: 1 });
       }
@@ -170,10 +306,15 @@ export function nextOccurrenceDate(event: AevumEvent, nowTs: number, boundaryMin
  * 返回用于「展示与倒数」的等效事件：循环事件将日期滚动到下一次发生。
  * 非循环事件原样返回（同引用，无额外分配）。
  */
-export function effectiveEvent(event: AevumEvent, nowTs: number, boundaryMin: number): AevumEvent {
+export function effectiveEvent(
+  event: AevumEvent,
+  nowTs: number,
+  boundaryMin: number,
+  strategy?: RecurrenceStrategy
+): AevumEvent {
   const r = event.recurrence;
   if (!r || r === 'none') return event;
-  const iso = nextOccurrenceDate(event, nowTs, boundaryMin);
+  const iso = nextOccurrenceDate(event, nowTs, boundaryMin, strategy);
   if (iso === event.date) return event;
   return { ...event, date: iso };
 }

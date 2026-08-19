@@ -222,7 +222,11 @@ export class EventDetail extends LitElement {
   render() {
     const ev = this.ev;
     const locale = getLocale();
-    const eff = ev ? effectiveEvent(ev, Date.now(), parseBoundary(getSettings().dayBoundary)) : undefined;
+    const s = getSettings();
+    const eff = ev ? effectiveEvent(ev, Date.now(), parseBoundary(s.dayBoundary), {
+      solarOverflow: s.solarOverflow,
+      lunarLeapStrategy: s.lunarLeapStrategy,
+    }) : undefined;
     const recurring = ev?.recurrence && ev.recurrence !== 'none';
     const dateLine = ev && eff
       ? [

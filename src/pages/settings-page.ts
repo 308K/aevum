@@ -23,6 +23,8 @@ import type {
   CalendarId,
   Granularity,
   LocalePref,
+  SolarOverflow,
+  LunarLeapStrategy,
   ThemeMode,
   WeekStart,
   WeekdayDisplay,
@@ -72,6 +74,30 @@ const WEEKDAY_I18N_KEYS: Record<WeekdayDisplay, 'weekdayOff' | 'weekdayShort' | 
   off: 'weekdayOff',
   short: 'weekdayShort',
   long: 'weekdayLong',
+};
+
+const SOLAR_OVERFLOW_KEYS: Record<SolarOverflow, 'solarOverflowRfc5545' | 'solarOverflowLastDay' | 'solarOverflowNextMonth'> = {
+  rfc5545: 'solarOverflowRfc5545',
+  lastDay: 'solarOverflowLastDay',
+  nextMonth: 'solarOverflowNextMonth',
+};
+
+const SOLAR_OVERFLOW_DESC_KEYS: Record<SolarOverflow, 'solarOverflowRfc5545Desc' | 'solarOverflowLastDayDesc' | 'solarOverflowNextMonthDesc'> = {
+  rfc5545: 'solarOverflowRfc5545Desc',
+  lastDay: 'solarOverflowLastDayDesc',
+  nextMonth: 'solarOverflowNextMonthDesc',
+};
+
+const LUNAR_LEAP_KEYS: Record<LunarLeapStrategy, 'lunarLeapNonLeap' | 'lunarLeapStrictLeap' | 'lunarLeapBoth'> = {
+  nonLeap: 'lunarLeapNonLeap',
+  strictLeap: 'lunarLeapStrictLeap',
+  both: 'lunarLeapBoth',
+};
+
+const LUNAR_LEAP_DESC_KEYS: Record<LunarLeapStrategy, 'lunarLeapNonLeapDesc' | 'lunarLeapStrictLeapDesc' | 'lunarLeapBothDesc'> = {
+  nonLeap: 'lunarLeapNonLeapDesc',
+  strictLeap: 'lunarLeapStrictLeapDesc',
+  both: 'lunarLeapBothDesc',
 };
 
 @customElement('settings-page')
@@ -665,6 +691,58 @@ export class SettingsPage extends LitElement {
                   </md-select-option>`
                 )}
               </md-outlined-select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <div class="group-title">${t('settingsRecurrenceStrategy')}</div>
+        <div class="card">
+          <div class="item">
+            <div>
+              <div class="label">${t('settingsSolarOverflow')}</div>
+              <div class="hint">${t('settingsSolarOverflowHint')}</div>
+            </div>
+            <div class="control">
+              <md-outlined-select
+                .value=${s.solarOverflow}
+                @change=${(e: Event) => this.set('solarOverflow', (e.target as MdOutlinedSelect).value as SolarOverflow)}
+              >
+                ${(['rfc5545', 'lastDay', 'nextMonth'] as SolarOverflow[]).map(
+                  (v) => html`<md-select-option value=${v}>
+                    <div slot="headline">${t(SOLAR_OVERFLOW_KEYS[v])}</div>
+                  </md-select-option>`
+                )}
+              </md-outlined-select>
+            </div>
+          </div>
+          <div class="item">
+            <div class="label" style="font-size: 0.82rem; color: var(--md-sys-color-on-surface-variant);">
+              ${t(SOLAR_OVERFLOW_DESC_KEYS[s.solarOverflow])}
+            </div>
+          </div>
+          <div class="item">
+            <div>
+              <div class="label">${t('settingsLunarLeapStrategy')}</div>
+              <div class="hint">${t('settingsLunarLeapStrategyHint')}</div>
+            </div>
+            <div class="control">
+              <md-outlined-select
+                .value=${s.lunarLeapStrategy}
+                @change=${(e: Event) => this.set('lunarLeapStrategy', (e.target as MdOutlinedSelect).value as LunarLeapStrategy)}
+              >
+                ${(['nonLeap', 'strictLeap', 'both'] as LunarLeapStrategy[]).map(
+                  (v) => html`<md-select-option value=${v}>
+                    <div slot="headline">${t(LUNAR_LEAP_KEYS[v])}</div>
+                  </md-select-option>`
+                )}
+              </md-outlined-select>
+            </div>
+          </div>
+          <div class="item">
+            <div class="label" style="font-size: 0.82rem; color: var(--md-sys-color-on-surface-variant);">
+              ${t(LUNAR_LEAP_DESC_KEYS[s.lunarLeapStrategy])}
             </div>
           </div>
         </div>

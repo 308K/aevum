@@ -87,7 +87,10 @@ export class TimeDisplay extends LitElement {
     const s = getSettings();
     const boundary = parseBoundary(s.dayBoundary);
     // 循环事件：将日期滚动到下一次发生，再计算差值
-    const eff = effectiveEvent(this.event, Date.now(), boundary);
+    const eff = effectiveEvent(this.event, Date.now(), boundary, {
+      solarOverflow: s.solarOverflow,
+      lunarLeapStrategy: s.lunarLeapStrategy,
+    });
     this.diff = computeDiff(eff, Date.now(), boundary, eff.granularity);
   }
 

@@ -138,6 +138,26 @@ export const enUS: LocaleDict = {
   weekdayShort: 'Short (Thu)',
   weekdayLong: 'Long (Thursday)',
 
+  // Recurrence strategy
+  settingsRecurrenceStrategy: 'Recurrence strategy',
+  settingsRecurrenceStrategyHint: 'How to handle recurring events when the target day does not exist',
+  settingsSolarOverflow: 'Solar overflow',
+  settingsSolarOverflowHint: 'How to handle Feb 29 (yearly) or day 31 (monthly) when they do not exist',
+  solarOverflowRfc5545: 'Skip (RFC 5545)',
+  solarOverflowRfc5545Desc: 'Skip Feb 29 in common years, skip day 31 in shorter months',
+  solarOverflowLastDay: 'Use last day of month',
+  solarOverflowLastDayDesc: 'Feb 28 replaces Feb 29 in common years',
+  solarOverflowNextMonth: 'Roll over to next month',
+  solarOverflowNextMonthDesc: 'Mar 1 replaces Feb 29 in common years',
+  settingsLunarLeapStrategy: 'Lunar leap month',
+  settingsLunarLeapStrategyHint: 'How to handle yearly events anchored to a lunar leap month',
+  lunarLeapNonLeap: 'Use non-leap month',
+  lunarLeapNonLeapDesc: 'Match the corresponding non-leap month instead',
+  lunarLeapStrictLeap: 'Strict leap month',
+  lunarLeapStrictLeapDesc: 'Only fire when the leap month occurs (may skip several years)',
+  lunarLeapBoth: 'Both leap and non-leap',
+  lunarLeapBothDesc: 'Fire on the non-leap month and again when the leap month occurs',
+
   // Data & background
   settingsSectionData: 'Data',
   dataExport: 'Export backup',

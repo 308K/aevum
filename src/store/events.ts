@@ -104,8 +104,12 @@ export function onEventsChange(fn: Listener): () => void {
 export function sortedEvents(list: AevumEvent[]): AevumEvent[] {
   const boundary = parseBoundary(getSettings().dayBoundary);
   const now = Date.now();
+  const s = getSettings();
   const keyOf = (e: AevumEvent) => {
-    const eff = effectiveEvent(e, now, boundary);
+    const eff = effectiveEvent(e, now, boundary, {
+      solarOverflow: s.solarOverflow,
+      lunarLeapStrategy: s.lunarLeapStrategy,
+    });
     return eff.date + (eff.time ?? 'T00:00');
   };
   return [...list].sort((a, b) => {

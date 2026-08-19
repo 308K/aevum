@@ -259,7 +259,10 @@ export async function drawShareImage(
 
   // —— 状态（还有/已经/就是今天） ——
   const s = getSettings();
-  const eff = effectiveEvent(ev, Date.now(), parseBoundary(s.dayBoundary));
+  const eff = effectiveEvent(ev, Date.now(), parseBoundary(s.dayBoundary), {
+    solarOverflow: s.solarOverflow,
+    lunarLeapStrategy: s.lunarLeapStrategy,
+  });
   const diff = computeDiff(eff, Date.now(), parseBoundary(s.dayBoundary), eff.granularity);
   const statusY = brandY + 120;
   ctx.font = `500 42px ${FONT}`;

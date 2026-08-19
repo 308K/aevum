@@ -179,7 +179,11 @@ export class EventCard extends LitElement {
   }
 
   render() {
-    const ev = effectiveEvent(this.event, Date.now(), parseBoundary(getSettings().dayBoundary));
+    const s = getSettings();
+    const ev = effectiveEvent(this.event, Date.now(), parseBoundary(s.dayBoundary), {
+      solarOverflow: s.solarOverflow,
+      lunarLeapStrategy: s.lunarLeapStrategy,
+    });
     const recurring = ev.recurrence && ev.recurrence !== 'none';
     const dateLine = [
       formatEventDate(ev.date, ev.calendar, getLocale()),
