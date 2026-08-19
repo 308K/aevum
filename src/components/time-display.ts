@@ -88,8 +88,8 @@ export class TimeDisplay extends LitElement {
     const boundary = parseBoundary(s.dayBoundary);
     // 循环事件：将日期滚动到下一次发生，再计算差值
     const eff = effectiveEvent(this.event, Date.now(), boundary, {
-      solarOverflow: s.solarOverflow,
-      lunarLeapStrategy: s.lunarLeapStrategy,
+      dayOverflow: s.dayOverflow,
+      leapMonthStrategy: s.leapMonthStrategy,
     });
     this.diff = computeDiff(eff, Date.now(), boundary, eff.granularity);
   }

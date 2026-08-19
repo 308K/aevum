@@ -107,8 +107,8 @@ export function sortedEvents(list: AevumEvent[]): AevumEvent[] {
   const s = getSettings();
   const keyOf = (e: AevumEvent) => {
     const eff = effectiveEvent(e, now, boundary, {
-      solarOverflow: s.solarOverflow,
-      lunarLeapStrategy: s.lunarLeapStrategy,
+      dayOverflow: s.dayOverflow,
+      leapMonthStrategy: s.leapMonthStrategy,
     });
     return eff.date + (eff.time ?? 'T00:00');
   };

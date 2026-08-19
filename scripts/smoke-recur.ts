@@ -31,8 +31,8 @@ const at = (iso: string, h = 0, m = 0): number => {
   return new Date(y, mo - 1, d, h, m, 0).getTime();
 };
 
-// 日本和历不涉及 solarOverflow（非公历），使用默认策略
-const strategy = { solarOverflow: 'lastDay' as const, lunarLeapStrategy: 'nonLeap' as const };
+// 日本和历使用默认策略
+const strategy = { dayOverflow: 'lastDay' as const, leapMonthStrategy: 'nonLeap' as const };
 
 console.log('== A. yearly 跨改元：昭和 63 年 3/3，1989-01-01 起算 → 1989-03-03（平成元年）==');
 check('昭和63年3/3 yearly', nextOccurrenceDate(mk('1988-03-03', 'yearly'), at('1989-01-01'), 0, strategy), '1989-03-03');

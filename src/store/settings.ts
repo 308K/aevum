@@ -1,7 +1,7 @@
 /**
  * 全局设置存储（localStorage 持久化 + 订阅通知）
  */
-import { DEFAULT_SETTINGS, type AevumSettings, defaultSolarOverflow, defaultLunarLeapStrategy } from '../types.js';
+import { DEFAULT_SETTINGS, type AevumSettings, defaultDayOverflow, defaultLeapMonthStrategy } from '../types.js';
 
 const STORAGE_KEY = 'aevum.settings.v1';
 
@@ -35,15 +35,16 @@ function load(): AevumSettings {
           ...merged.customThemes,
         ];
       }
-      // 新增字段迁移：solarOverflow / lunarLeapStrategy 缺失时按浏览器 locale 推断默认值
+      // 新增字段迁移：dayOverflow / leapMonthStrategy 缺失时按浏览器 locale 推断默认值
+      // 同时兼容旧字段名 solarOverflow / lunarLeapStrategy
       const rawObj = JSON.parse(raw) as Record<string, unknown>;
-      if (!('solarOverflow' in rawObj)) {
+      if (!('dayOverflow' in rawObj) && !('solarOverflow' in rawObj)) {
         const navLocale = (navigator.language || 'zh-CN');
-        merged.solarOverflow = defaultSolarOverflow(navLocale);
+        merged.dayOverflow = defaultDayOverflow(navLocale);
       }
-      if (!('lunarLeapStrategy' in rawObj)) {
+      if (!('leapMonthStrategy' in rawObj) && !('lunarLeapStrategy' in rawObj)) {
         const navLocale = (navigator.language || 'zh-CN');
-        merged.lunarLeapStrategy = defaultLunarLeapStrategy(navLocale);
+        merged.leapMonthStrategy = defaultLeapMonthStrategy(navLocale);
       }
       return merged;
     }
@@ -54,8 +55,8 @@ function load(): AevumSettings {
   const navLocale = (navigator.language || 'zh-CN');
   return {
     ...DEFAULT_SETTINGS,
-    solarOverflow: defaultSolarOverflow(navLocale),
-    lunarLeapStrategy: defaultLunarLeapStrategy(navLocale),
+    dayOverflow: defaultDayOverflow(navLocale),
+    leapMonthStrategy: defaultLeapMonthStrategy(navLocale),
   };
 }
 

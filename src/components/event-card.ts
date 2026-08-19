@@ -181,8 +181,8 @@ export class EventCard extends LitElement {
   render() {
     const s = getSettings();
     const ev = effectiveEvent(this.event, Date.now(), parseBoundary(s.dayBoundary), {
-      solarOverflow: s.solarOverflow,
-      lunarLeapStrategy: s.lunarLeapStrategy,
+      dayOverflow: s.dayOverflow,
+      leapMonthStrategy: s.leapMonthStrategy,
     });
     const recurring = ev.recurrence && ev.recurrence !== 'none';
     const dateLine = [

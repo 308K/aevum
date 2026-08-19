@@ -1,12 +1,12 @@
 /**
- * 循环事件策略验证（solarOverflow + lunarLeapStrategy）
+ * 循环事件策略验证（dayOverflow + leapMonthStrategy）
  * 覆盖全部 7 种历法：gregory / chinese / islamic / hebrew / persian / buddhist / japanese
  *
  * 运行：bun scripts/smoke-overflow.ts
  */
 import { ensureTemporalReady, getTemporalForCalendar } from '../src/utils/temporal.ts';
 import { nextOccurrenceDate } from '../src/utils/time-calc.ts';
-import type { AevumEvent, CalendarId, SolarOverflow, LunarLeapStrategy } from '../src/types.ts';
+import type { AevumEvent, CalendarId, DayOverflow, LeapMonthStrategy } from '../src/types.ts';
 
 let pass = 0, fail = 0;
 function check(name: string, got: string, want: string) {
@@ -20,7 +20,7 @@ console.log(`== 循环事件策略验证（${impl} Temporal）==\n`);
 
 const mk = (date: string, recurrence: AevumEvent['recurrence'], calendar: AevumEvent['calendar'] = 'gregory', time?: string): AevumEvent => ({ id: 't', name: 't', date, calendar, recurrence, granularity: 'day', tags: [], pinned: false, createdAt: 0, time });
 const at = (iso: string, h = 0, m = 0): number => { const [y, mo, d] = iso.split('-').map(Number); return new Date(y, mo - 1, d, h, m, 0).getTime(); };
-const strat = (so: SolarOverflow = 'lastDay', ll: LunarLeapStrategy = 'nonLeap') => ({ solarOverflow: so, lunarLeapStrategy: ll });
+const strat = (so: DayOverflow = 'lastDay', ll: LeapMonthStrategy = 'nonLeap') => ({ dayOverflow: so, leapMonthStrategy: ll });
 const calIdOf = (id: CalendarId) => id === 'islamic' ? 'islamic-umalqura' : id;
 const pdOf = (calId: string, iso: string) => { const T = getTemporalForCalendar(calId); const [y, m, d] = iso.split('-').map(Number); return T.PlainDate.from({ year: y, month: m, day: d }).withCalendar(calId); };
 const monthCodeOf = (calId: string, iso: string) => pdOf(calId, iso).monthCode;
@@ -39,7 +39,7 @@ const CALS: { id: CalendarId; anchorIso: string; label: string }[] = [
   { id: 'japanese', anchorIso: '2025-01-01', label: '日本和历' },
 ];
 
-// ============ A. 公历年循环 2/29 × solarOverflow ============
+// ============ A. 公历年循环 2/29 × dayOverflow ============
 console.log('== A. 公历年循环 2/29，从 2025-01-01 起算（平年）==');
 check('2/29 yearly rfc5545 → 2028-02-29', nextOccurrenceDate(mk('2024-02-29', 'yearly'), at('2025-01-01'), 0, strat('rfc5545')), '2028-02-29');
 check('2/29 yearly lastDay → 2025-02-28', nextOccurrenceDate(mk('2024-02-29', 'yearly'), at('2025-01-01'), 0, strat('lastDay')), '2025-02-28');
@@ -49,7 +49,7 @@ console.log('\n== A2. 公历年循环 2/29，从 2023-01-01 起算 ==');
 check('2/29 yearly rfc5545 2023起 → 2024-02-29', nextOccurrenceDate(mk('2024-02-29', 'yearly'), at('2023-01-01'), 0, strat('rfc5545')), '2024-02-29');
 check('2/29 yearly lastDay 2023起 → 2023-02-28', nextOccurrenceDate(mk('2024-02-29', 'yearly'), at('2023-01-01'), 0, strat('lastDay')), '2023-02-28');
 
-// ============ B. 公历月循环 31 日 × solarOverflow ============
+// ============ B. 公历月循环 31 日 × dayOverflow ============
 console.log('\n== B. 公历月循环 1/31，从 2025-02-01 起算 ==');
 check('1/31 monthly rfc5545 2月起 → 2025-03-31', nextOccurrenceDate(mk('2025-01-31', 'monthly'), at('2025-02-01'), 0, strat('rfc5545')), '2025-03-31');
 check('1/31 monthly lastDay 2月起 → 2025-02-28', nextOccurrenceDate(mk('2025-01-31', 'monthly'), at('2025-02-01'), 0, strat('lastDay')), '2025-02-28');
@@ -60,7 +60,7 @@ check('1/31 monthly rfc5545 4月起 → 2025-05-31', nextOccurrenceDate(mk('2025
 check('1/31 monthly lastDay 4月起 → 2025-04-30', nextOccurrenceDate(mk('2025-01-31', 'monthly'), at('2025-04-01'), 0, strat('lastDay')), '2025-04-30');
 check('1/31 monthly nextMonth 4月起 → 2025-05-01', nextOccurrenceDate(mk('2025-01-31', 'monthly'), at('2025-04-01'), 0, strat('nextMonth')), '2025-05-01');
 
-// ============ C. 农历闰月年循环 × lunarLeapStrategy ============
+// ============ C. 农历闰月年循环 × leapMonthStrategy ============
 console.log('\n== C. 农历闰月年循环策略 ==');
 const Tch = getTemporalForCalendar('chinese');
 let leapMonthDate = '';
@@ -75,7 +75,7 @@ if (leapMonthDate) {
   const r3d = new Date(r3); check('both 2026年夏季', r3d.getFullYear() === 2026 && r3d.getMonth() >= 5 && r3d.getMonth() <= 8 ? 'ok' : 'wrong', 'ok');
 } else { console.log('  未找到2025年农历闰月，跳过'); }
 
-// ============ D. 希伯来历闰月年循环 × lunarLeapStrategy ============
+// ============ D. 希伯来历闰月年循环 × leapMonthStrategy ============
 console.log('\n== D. 希伯来历闰月年循环策略 ==');
 const The = getTemporalForCalendar('hebrew');
 let hebrewLeapDate = '';

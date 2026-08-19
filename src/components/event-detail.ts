@@ -224,8 +224,8 @@ export class EventDetail extends LitElement {
     const locale = getLocale();
     const s = getSettings();
     const eff = ev ? effectiveEvent(ev, Date.now(), parseBoundary(s.dayBoundary), {
-      solarOverflow: s.solarOverflow,
-      lunarLeapStrategy: s.lunarLeapStrategy,
+      dayOverflow: s.dayOverflow,
+      leapMonthStrategy: s.leapMonthStrategy,
     }) : undefined;
     const recurring = ev?.recurrence && ev.recurrence !== 'none';
     const dateLine = ev && eff
