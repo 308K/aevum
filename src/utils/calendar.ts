@@ -306,8 +306,16 @@ export function keysFromGregorian(date: Date, cal: CalendarId): DateSelection {
  * （参考 React Aria isSameMonth 的 startOfMonth 降维比较策略）
  */
 export function startOfMonthKeys(date: Date, cal: CalendarId): DateSelection {
-  const first = new Date(date.getFullYear(), date.getMonth(), 1);
-  return keysFromGregorian(first, cal);
+  if (cal === 'gregory' || cal === 'juche' || cal === 'japanese') {
+    // 公历/主体历/日本和历：公历月首即历法月首（日本和历虽可能月中改元，
+    // 但月首 yearKey 决定月份归属，与 monthOptions/dayOptions 一致）
+    const first = new Date(date.getFullYear(), date.getMonth(), 1);
+    return keysFromGregorian(first, cal);
+  }
+  // 其他历法（农历/伊斯兰/希伯来/波斯/佛教/民国/印度/埃塞俄比亚/科普特/韩国农历）：
+  // 历法月与公历月不对齐，公历月首可能属于不同的历法月。
+  // 直接取该日期自身的历法 yearKey/monthKey 即可正确标识所属月份。
+  return keysFromGregorian(date, cal);
 }
 
 /**
