@@ -20,11 +20,12 @@ const DAY_MS = 86_400_000;
 
 /**
  * 应用层 CalendarId → Temporal 日历标识符。
- * 与 src/utils/calendar.ts 的 temporalCalId 保持一致：'islamic' 在 Temporal 中不存在，
- * 映射为 'islamic-umalqura'。
+ * 与 src/utils/calendar.ts 的 temporalCalId 保持一致：
+ * 'juche'（主体历）底层使用 gregory，其他历法 ID 直接使用。
  */
 function temporalCalId(cal: CalendarId): string {
-  return cal === 'islamic' ? 'islamic-umalqura' : cal;
+  if (cal === 'juche') return 'gregory';
+  return cal;
 }
 
 /**

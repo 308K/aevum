@@ -3,6 +3,7 @@
  * 纯前端方案：所有数据仅保存在用户本机浏览器
  */
 import type { AevumEvent } from '../types.js';
+import { migrateCalendarId } from '../types.js';
 import { effectiveEvent, parseBoundary } from '../utils/time-calc.js';
 import { normalizeEventTags } from './tags.js';
 import { getSettings } from './settings.js';
@@ -20,9 +21,11 @@ function load(): AevumEvent[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        // 迁移旧格式（标签为 {label,color} 对象）为标签 id 列表
+        // 迁移旧格式（标签为 {label,color} 对象）为标签 id 列表；
+        // 同时迁移旧版历法 ID（如 'islamic' → 'islamic-umalqura'）
         return (parsed as AevumEvent[]).map((e) => ({
           ...e,
+          calendar: migrateCalendarId(String(e.calendar)),
           tags: normalizeEventTags((e as AevumEvent & { tags?: unknown }).tags),
         }));
       }

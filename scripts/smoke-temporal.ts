@@ -48,19 +48,32 @@ check('2025-01-29 农历', formatEventDate('2025-01-29', 'chinese', 'zh-CN'), '2
 check('2026-01-26 腊八', formatEventDate('2026-01-26', 'chinese', 'zh-CN'), '2025年 乙巳年 腊月初八');
 
 console.log('== 1.5 非公历纪元（era）本地化 ==');
-check('islamic 中文纪元', formatEventDate('2026-07-31', 'islamic', 'zh-CN'), '伊斯兰历1448年2月17日');
-check('islamic 英文纪元', formatEventDate('2026-07-31', 'islamic', 'en-US').endsWith('AH'), true);
+check('islamic-umalqura 中文纪元', formatEventDate('2026-07-31', 'islamic-umalqura', 'zh-CN'), '伊斯兰历1448年2月17日');
+check('islamic-umalqura 英文纪元', formatEventDate('2026-07-31', 'islamic-umalqura', 'en-US').endsWith('AH'), true);
 check('hebrew 中文纪元', formatEventDate('2026-07-31', 'hebrew', 'zh-CN').startsWith('希伯来历'), true);
 check('persian 中文纪元', formatEventDate('2026-07-31', 'persian', 'zh-CN').startsWith('波斯历'), true);
 check('buddhist 中文纪元', formatEventDate('2026-07-31', 'buddhist', 'zh-CN').startsWith('佛历'), true);
+// 新增历法纪元
+check('roc 中文纪元', formatEventDate('2026-07-31', 'roc', 'zh-CN').startsWith('民国'), true);
+check('ethiopic 中文纪元', formatEventDate('2026-07-31', 'ethiopic', 'zh-CN').startsWith('埃塞俄比亚历'), true);
+check('coptic 中文纪元', formatEventDate('2026-07-31', 'coptic', 'zh-CN').startsWith('科普特历'), true);
+check('juche 中文纪元', formatEventDate('2026-07-31', 'juche', 'zh-CN'), '主体115年7月31日');
+check('islamic-umalqura 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-umalqura').yearKey, 'islamic-umalqura|1448');
+check('islamic-civil 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-civil').yearKey.startsWith('islamic-civil|'), true);
+check('islamic-tbla 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-tbla').yearKey.startsWith('islamic-tbla|'), true);
+check('islamic-rgsa 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-rgsa').yearKey.startsWith('islamic-rgsa|'), true);
+check('roc 年份键', keysFromGregorian(new Date(2026, 6, 31), 'roc').yearKey.startsWith('roc|'), true);
+check('indian 年份键', keysFromGregorian(new Date(2026, 6, 31), 'indian').yearKey.startsWith('indian|'), true);
+check('ethiopic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'ethiopic').yearKey.startsWith('ethiopic|'), true);
+check('coptic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'coptic').yearKey.startsWith('coptic|'), true);
+check('juche 年份键', keysFromGregorian(new Date(2026, 6, 31), 'juche').yearKey, 'juche|115');
+check('dangi 年份键', keysFromGregorian(new Date(2026, 6, 31), 'dangi').yearKey.startsWith('dangi|'), true);
 // 希伯来历正文
 check('hebrew 闰年闰亚达月', formatEventDate('2027-02-10', 'hebrew', 'zh-CN'), '希伯来历5787年6月3日');
 check('hebrew 闰年亚达月', formatEventDate('2027-03-10', 'hebrew', 'zh-CN'), '希伯来历5787年7月1日');
-// 年份键稳定且 locale 无关
-check('islamic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic').yearKey, 'islamic|1448');
 
 console.log('== 2. 历法键 ↔ 公历 往返 ==');
-const cals: CalendarId[] = ['gregory', 'chinese', 'islamic', 'hebrew', 'persian', 'buddhist', 'japanese'];
+const cals: CalendarId[] = ['gregory', 'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'islamic-rgsa', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi', 'juche'];
 for (const cal of cals) {
   const src = new Date(2026, 6, 31); // 2026-07-31
   const keys = keysFromGregorian(src, cal);
@@ -143,7 +156,8 @@ check('农历网格公历=往返公历', gridGreg ? `${gridGreg.greg.getFullYear
 
 console.log('== 8. 日历表头年月格式化 ==');
 check('公历表头', formatYearMonthHeader('gregory', '2026', '8', 'zh-CN'), '2026年8月');
-check('伊斯兰历表头', formatYearMonthHeader('islamic', 'islamic|1448', '2', 'zh-CN'), '伊斯兰历1448年2月');
+check('伊斯兰历表头', formatYearMonthHeader('islamic-umalqura', 'islamic-umalqura|1448', '2', 'zh-CN'), '伊斯兰历1448年2月');
+check('主体历表头', formatYearMonthHeader('juche', 'juche|115', '7', 'zh-CN'), '主体115年7月');
 check('希伯来 闰年 Tishri=1月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Tishri', 'zh-CN'), '希伯来历5787年1月');
 check('希伯来 闰年 Adar I=6月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar I', 'zh-CN'), '希伯来历5787年6月');
 check('希伯来 闰年 Adar II=7月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar II', 'zh-CN'), '希伯来历5787年7月');

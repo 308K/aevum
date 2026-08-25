@@ -37,8 +37,8 @@ check('2026-01-26 腊八', formatEventDate('2026-01-26', 'chinese', 'zh-CN'), '2
 
 console.log('== 1.5 非公历纪元（era）本地化（规避 Android Chrome 裁减 ICU 的 era 错误）==');
 // 纪元名必须用权威映射，不依赖 Intl 的 era 字段（Android 上会退化成 “BC” 且未中文本地化）
-check('islamic 中文纪元', formatEventDate('2026-07-31', 'islamic', 'zh-CN'), '伊斯兰历1448年2月17日');
-check('islamic 英文纪元', formatEventDate('2026-07-31', 'islamic', 'en-US').endsWith('AH'), true);
+check('islamic-umalqura 中文纪元', formatEventDate('2026-07-31', 'islamic-umalqura', 'zh-CN'), '伊斯兰历1448年2月17日');
+check('islamic-umalqura 英文纪元', formatEventDate('2026-07-31', 'islamic-umalqura', 'en-US').endsWith('AH'), true);
 check('hebrew 中文纪元', formatEventDate('2026-07-31', 'hebrew', 'zh-CN').startsWith('希伯来历'), true);
 check('persian 中文纪元', formatEventDate('2026-07-31', 'persian', 'zh-CN').startsWith('波斯历'), true);
 check('buddhist 中文纪元', formatEventDate('2026-07-31', 'buddhist', 'zh-CN').startsWith('佛历'), true);
@@ -46,10 +46,10 @@ check('buddhist 中文纪元', formatEventDate('2026-07-31', 'buddhist', 'zh-CN'
 check('hebrew 闰年闰亚达月', formatEventDate('2027-02-10', 'hebrew', 'zh-CN'), '希伯来历5787年6月3日');
 check('hebrew 闰年亚达月', formatEventDate('2027-03-10', 'hebrew', 'zh-CN'), '希伯来历5787年7月1日');
 // 年份键稳定且 locale 无关：历法id|年（不受 Android era bug 影响）
-check('islamic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic').yearKey, 'islamic|1448');
+check('islamic-umalqura 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-umalqura').yearKey, 'islamic-umalqura|1448');
 
 console.log('== 2. 历法键 ↔ 公历 往返 ==');
-const cals: CalendarId[] = ['gregory', 'chinese', 'islamic', 'hebrew', 'persian', 'buddhist', 'japanese'];
+const cals: CalendarId[] = ['gregory', 'chinese', 'islamic-umalqura', 'hebrew', 'persian', 'buddhist', 'japanese'];
 for (const cal of cals) {
   const src = new Date(2026, 6, 31); // 2026-07-31
   const keys = keysFromGregorian(src, cal);
@@ -192,21 +192,21 @@ console.log('== 8.5 日历表头年月格式化（中文）==');
 // 公历 2026 年 8 月
 check('公历表头', formatYearMonthHeader('gregory', '2026', '8', 'zh-CN'), '2026年8月');
 // 伊斯兰历 1448 年 2 月
-check('伊斯兰历表头', formatYearMonthHeader('islamic', 'islamic|1448', '2', 'zh-CN'), '伊斯兰历1448年2月');
+check('伊斯兰历表头', formatYearMonthHeader('islamic-umalqura', 'islamic-umalqura|1448', 'M02', 'zh-CN'), '伊斯兰历1448年2月');
 // 希伯来历：中文表头用民用月序（与 ICU 一致：Tishri=1 … Elul=13 闰年 / 12 平年）
-check('希伯来 闰年 Tishri=1月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Tishri', 'zh-CN'), '希伯来历5787年1月');
-check('希伯来 闰年 Adar I=6月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar I', 'zh-CN'), '希伯来历5787年6月');
-check('希伯来 闰年 Adar II=7月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar II', 'zh-CN'), '希伯来历5787年7月');
-check('希伯来 闰年 末月Elul=13月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Elul', 'zh-CN'), '希伯来历5787年13月');
-check('希伯来 平年 Adar=6月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'Adar', 'zh-CN'), '希伯来历5786年6月');
-check('希伯来 平年 末月Elul=12月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'Elul', 'zh-CN'), '希伯来历5786年12月');
-const hbCiv = ['Tishri', 'Heshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar I', 'Adar II', 'Nisan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul']
+check('希伯来 闰年 Tishri=1月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M01', 'zh-CN'), '希伯来历5787年1月');
+check('希伯来 闰年 Adar I=6月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M05L', 'zh-CN'), '希伯来历5787年6月');
+check('希伯来 闰年 Adar II=7月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M06', 'zh-CN'), '希伯来历5787年7月');
+check('希伯来 闰年 末月Elul=13月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M12', 'zh-CN'), '希伯来历5787年13月');
+check('希伯来 平年 Adar=6月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'M06', 'zh-CN'), '希伯来历5786年6月');
+check('希伯来 平年 末月Elul=12月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'M12', 'zh-CN'), '希伯来历5786年12月');
+const hbCiv = ['M01','M02','M03','M04','M05','M05L','M06','M07','M08','M09','M10','M11','M12']
   .map((mk) => formatYearMonthHeader('hebrew', 'hebrew|5787', mk, 'zh-CN'));
 check('希伯来 闰年民用序连续1-13', hbCiv.every((h, i) => h.endsWith(`${i + 1}月`)), true);
 // 波斯历 1405 年 5 月
-check('波斯历表头', formatYearMonthHeader('persian', 'persian|1405', '5', 'zh-CN').startsWith('波斯历1405年'), true);
+check('波斯历表头', formatYearMonthHeader('persian', 'persian|1405', 'M05', 'zh-CN').startsWith('波斯历1405年'), true);
 // 佛教历 2569 年 8 月
-check('佛教历表头', formatYearMonthHeader('buddhist', 'buddhist|2569', '8', 'zh-CN').startsWith('佛历2569年'), true);
+check('佛教历表头', formatYearMonthHeader('buddhist', 'buddhist|2569', 'M08', 'zh-CN').startsWith('佛历2569年'), true);
 // 日本和历 令和 8 年 8 月
 check('日本和历表头', formatYearMonthHeader('japanese', '令和|8', '8', 'zh-CN'), '令和8年8月');
 // 农历沿用既有风格（含公元·干支与汉字月名）

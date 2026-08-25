@@ -4,11 +4,31 @@
 export type CalendarId =
   | 'gregory'
   | 'chinese'
-  | 'islamic'
+  | 'islamic-umalqura'
+  | 'islamic-civil'
+  | 'islamic-tbla'
+  | 'islamic-rgsa'
   | 'hebrew'
   | 'persian'
   | 'buddhist'
-  | 'japanese';
+  | 'japanese'
+  | 'roc'
+  | 'indian'
+  | 'ethiopic'
+  | 'ethiopic-amete-alem'
+  | 'coptic'
+  | 'dangi'
+  | 'juche';
+
+/** 旧版 CalendarId → 当前 CalendarId 的迁移映射（用于 localStorage 旧数据兼容） */
+const DEPRECATED_CAL: Record<string, CalendarId> = {
+  islamic: 'islamic-umalqura',
+};
+
+/** 将旧版 CalendarId 迁移为当前 CalendarId（无变化则原样返回） */
+export function migrateCalendarId(cal: string): CalendarId {
+  return DEPRECATED_CAL[cal] ?? (cal as CalendarId);
+}
 
 /** 时间展示粒度 */
 export type Granularity =

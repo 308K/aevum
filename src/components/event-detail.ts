@@ -22,15 +22,25 @@ import { icon } from '../icons.js';
 import { toast } from './app-snackbar.js';
 import './time-display.js';
 
-const CAL_I18N_KEYS = {
+const CAL_I18N_KEYS: Record<string, string> = {
   gregory: 'calGregory',
   chinese: 'calChinese',
-  islamic: 'calIslamic',
+  'islamic-umalqura': 'calIslamicUmalqura',
+  'islamic-civil': 'calIslamicCivil',
+  'islamic-tbla': 'calIslamicTbla',
+  'islamic-rgsa': 'calIslamicRgsa',
   hebrew: 'calHebrew',
   persian: 'calPersian',
   buddhist: 'calBuddhist',
   japanese: 'calJapanese',
-} as const;
+  roc: 'calRoc',
+  indian: 'calIndian',
+  ethiopic: 'calEthiopic',
+  'ethiopic-amete-alem': 'calEthiopicAmeteAlem',
+  coptic: 'calCoptic',
+  dangi: 'calDangi',
+  juche: 'calJuche',
+};
 
 const GRAN_I18N_KEYS = {
   day: 'granDay',
@@ -272,7 +282,7 @@ export class EventDetail extends LitElement {
                 </div>
                 <dl class="meta">
                   <dt>${t('detailCalendar')}</dt>
-                  <dd>${t(CAL_I18N_KEYS[ev.calendar])}</dd>
+                  <dd>${t(CAL_I18N_KEYS[ev.calendar] as never)}</dd>
                   <dt>${t('detailGranularity')}</dt>
                   <dd>${t(GRAN_I18N_KEYS[ev.granularity])}</dd>
                   ${recurring

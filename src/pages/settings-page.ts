@@ -636,7 +636,7 @@ export class SettingsPage extends LitElement {
               >
                 ${CALENDAR_IDS.map(
                   (cal) => html`<md-select-option value=${cal}>
-                    <div slot="headline">${t(`cal${cal[0].toUpperCase()}${cal.slice(1)}` as never)}</div>
+                    <div slot="headline">${t(`cal${cal.replace(/(^|-)(\w)/g, (_, p, c) => c.toUpperCase())}` as never)}</div>
                   </md-select-option>`
                 )}
               </md-outlined-select>

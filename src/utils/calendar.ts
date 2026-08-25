@@ -14,11 +14,21 @@ import type { CalendarId, WeekdayDisplay } from '../types.js';
 export const CALENDAR_IDS: CalendarId[] = [
   'gregory',
   'chinese',
-  'islamic',
+  'islamic-umalqura',
+  'islamic-civil',
+  'islamic-tbla',
+  'islamic-rgsa',
   'hebrew',
   'persian',
   'buddhist',
   'japanese',
+  'roc',
+  'indian',
+  'ethiopic',
+  'ethiopic-amete-alem',
+  'coptic',
+  'dangi',
+  'juche',
 ];
 
 export interface DateSelection {
@@ -34,7 +44,8 @@ export interface CalOption {
 
 /**
  * 将应用层 CalendarId 映射为 Temporal 支持的日历标识符。
- * - 'islamic' 在 Temporal 中不存在，映射为 'islamic-umalqura'（与 Intl 的 'islamic' 一致）
+ * - 'juche'（主体历）在 Temporal/Intl 中不存在，底层使用 gregory 做日期运算，
+ *   年份偏移在应用层处理（jucheYear = gregYear - 1911）
  * - 其他历法标识符在 Temporal 中与 Intl 一致
  *
  * 注意：某些浏览器（如 Firefox 139-148）原生 Temporal 不支持 islamic-umalqura，
@@ -42,7 +53,7 @@ export interface CalOption {
  * 原生或 polyfill 实现。
  */
 function temporalCalId(cal: CalendarId): string {
-  if (cal === 'islamic') return 'islamic-umalqura';
+  if (cal === 'juche') return 'gregory';
   return cal;
 }
 
@@ -60,10 +71,20 @@ function lunarDayName(dayStr: string): string {
 }
 
 const ERA_KEYS: Partial<Record<CalendarId, keyof LocaleDict>> = {
-  islamic: 'eraIslamic',
+  'islamic-umalqura': 'eraIslamicUmalqura',
+  'islamic-civil': 'eraIslamicCivil',
+  'islamic-tbla': 'eraIslamicTbla',
+  'islamic-rgsa': 'eraIslamicRgsa',
   hebrew: 'eraHebrew',
   persian: 'eraPersian',
   buddhist: 'eraBuddhist',
+  roc: 'eraRoc',
+  ethiopic: 'eraEthiopic',
+  'ethiopic-amete-alem': 'eraEthiopicAlem',
+  coptic: 'eraCoptic',
+  indian: 'eraIndian',
+  dangi: 'eraDangi',
+  juche: 'eraJuche',
 };
 
 function eraName(cal: CalendarId, locale: string): string {
@@ -84,11 +105,11 @@ const fmtCache = new Map<string, Intl.DateTimeFormat>();
 
 /**
  * Intl 日历标签映射。
- * 应用层 'islamic' 在 Intl 中需要显式指定变体（Firefox 会报错要求指定），
- * 映射为 'islamic-umalqura'（与 Temporal 的 temporalCalId 保持一致）。
+ * - 'juche' 底层使用 gregory，Intl 标签为 gregory
+ * - 其他历法标识符与 Intl 一致
  */
 function intlCalTag(cal: CalendarId): string {
-  if (cal === 'islamic') return 'islamic-umalqura';
+  if (cal === 'juche') return 'gregory';
   return cal;
 }
 
@@ -175,10 +196,22 @@ function keyPartsFromTemporal(
   const dayNum = pdCal.day;
   const monthCode = pdCal.monthCode;
 
-  if (cal === 'gregory') {
+  if (cal === 'gregory' || cal === 'juche') {
     const greg = pdCal.withCalendar('gregory');
     const date = new Date(greg.year, greg.month - 1, greg.day);
     const monthName = fmt(displayLocale, 'gregory', { month: 'long' }).format(date);
+    if (cal === 'juche') {
+      const jucheYear = greg.year - 1911;
+      const era = eraName('juche', displayLocale);
+      return {
+        yearKey: `juche|${jucheYear}`,
+        yearDisplay: era ? `${era}${jucheYear}` : String(jucheYear),
+        monthKey: String(monthNum),
+        monthDisplay: monthName,
+        dayKey: String(dayNum),
+        dayDisplay: String(dayNum),
+      };
+    }
     return {
       yearKey: String(yearNum),
       yearDisplay: String(yearNum),
@@ -229,21 +262,32 @@ function keyPartsFromTemporal(
     };
   }
 
-  // 其他历法（伊斯兰/希伯来/波斯/佛教）
+  // 其他历法（伊斯兰/希伯来/波斯/佛教/民国/印度/埃塞俄比亚/科普特/韩国农历）
   const greg = pdCal.withCalendar('gregory');
   const date = new Date(greg.year, greg.month - 1, greg.day);
   const kp = partsOf(fmt('en-US', cal, { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' }), date);
   const dp = partsOf(fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }), date);
-  const yearStr = kp.year ?? String(yearNum);
+  // 统一用 Temporal 的 year 做键：dangi 的 Intl 无 year 字段（用 relatedYear），
+  // islamic-rgsa 的 Intl year 可能与 Temporal year 不一致。
+  // ethiopic 的 Temporal year 是 Amete Alem 纪年（如 7517），但 yearKey 需存储
+  // eraYear（Amete Mihret 纪年，如 2017），否则 resolveYearStart 无法正确构造。
+  const yearStr = cal === 'ethiopic'
+    ? String(pdCal.eraYear ?? yearNum)
+    : String(yearNum);
   const eraStr = eraName(cal, displayLocale);
   const yearKey = `${cal}|${yearStr}`;
   const yearDisplay = eraStr ? `${eraStr} ${yearStr}` : yearStr;
+  // monthKey 统一使用 monthCode（如 M07、M06L），而非 Intl numeric month。
+  // 原因：islamic-rgsa 的 Intl 月份编号在同一 Temporal 历法月内可能因日期不同而变化
+  // （新月发生在公历月中旬时，月中的 Intl 月份可能与月首不同），
+  // 导致 keysFromGregorian（针对具体日期）与 monthOptions（针对月首）生成不同 monthKey。
+  // monthCode 在同一 Temporal 历法月内是稳定的，且可逆。
   return {
     yearKey,
     yearDisplay,
-    monthKey: kp.month ?? monthCode,
-    monthDisplay: dp.month ?? monthCode,
-    dayKey: kp.day ?? String(dayNum),
+    monthKey: monthCode,
+    monthDisplay: dp.month ?? kp.month ?? monthCode,
+    dayKey: String(dayNum),
     dayDisplay: dp.day ?? String(dayNum),
   };
 }
@@ -301,10 +345,17 @@ export function yearOptions(cal: CalendarId, refDate: Date, displayLocale = 'zh-
   const calId = temporalCalId(cal);
   const center = toPlainDateForCal(refDate, calId);
 
-  if (cal === 'gregory') {
+  if (cal === 'gregory' || cal === 'juche') {
     const entries: YearEntry[] = [];
     for (let y = center.year - SPAN_YEARS; y <= center.year + SPAN_YEARS; y++) {
-      entries.push({ key: String(y), display: String(y), firstSeen: new Date(y, 0, 1) });
+      if (cal === 'juche') {
+        const jucheYear = y - 1911;
+        if (jucheYear < 1) continue;
+        const era = eraName('juche', displayLocale);
+        entries.push({ key: `juche|${jucheYear}`, display: era ? `${era}${jucheYear}` : String(jucheYear), firstSeen: new Date(y, 0, 1) });
+      } else {
+        entries.push({ key: String(y), display: String(y), firstSeen: new Date(y, 0, 1) });
+      }
     }
     yearCache.set(cacheKey, entries);
     return entries;
@@ -394,8 +445,11 @@ function resolveYearStart(cal: CalendarId, yearKey: string, displayLocale: strin
   const calId = temporalCalId(cal);
   const T = getTemporalForCalendar(calId);
 
-  if (cal === 'gregory') {
-    const y = Number(yearKey);
+  if (cal === 'gregory' || cal === 'juche') {
+    // juche 底层用 gregory，yearKey 格式为 "juche|NN"
+    const y = cal === 'juche'
+      ? Number(yearKey.split('|')[1]) + 1911
+      : Number(yearKey);
     if (!y) return null;
     return T.PlainDate.from({ calendar: calId, year: y, month: 1, day: 1 });
   }
@@ -457,11 +511,22 @@ function resolveYearStart(cal: CalendarId, yearKey: string, displayLocale: strin
     return null;
   }
 
-  // 伊斯兰/希伯来/波斯/佛教：yearKey = "cal|yearNum"
+  // 伊斯兰/希伯来/波斯/佛教/民国/印度/埃塞俄比亚/科普特：yearKey = "cal|yearNum"
   const yearNumStr = yearKey.split('|')[1];
   const yearNum = Number(yearNumStr);
   if (!yearNum) return null;
   try {
+    // ethiopic 日历的 year 是 Amete Alem 纪年（如 7518），
+    // 而 yearKey 中存储的是 eraYear（Amete Mihret 纪年，如 2018）。
+    // 需要用 era+eraYear 构造，否则 year=2018 会得到公元前 3475 年。
+    if (cal === 'ethiopic') {
+      // 从参考日期提取 era 字符串（polyfill 用 'ethiopic'，原生可能不同）
+      const refPd = T.PlainDate.from({ year: 2025, month: 1, day: 1 }).withCalendar(calId);
+      const era = refPd.era;
+      if (era) {
+        return T.PlainDate.from({ calendar: calId, era, eraYear: yearNum, month: 1, day: 1 });
+      }
+    }
     return T.PlainDate.from({ calendar: calId, year: yearNum, month: 1, day: 1 });
   } catch {
     return null;
@@ -479,8 +544,11 @@ export function monthOptions(cal: CalendarId, yearKey: string, displayLocale = '
 
   let entries: MonthEntry[] = [];
 
-  if (cal === 'gregory') {
-    const y = Number(yearKey);
+  if (cal === 'gregory' || cal === 'juche') {
+    // juche yearKey = "juche|NN"，需还原公历年
+    const y = cal === 'juche'
+      ? Number(yearKey.split('|')[1]) + 1911
+      : Number(yearKey);
     entries = Array.from({ length: 12 }, (_, i) => ({
       key: String(i + 1),
       display: fmt(displayLocale, 'gregory', { month: 'long' }).format(new Date(2024, i, 1)),
@@ -569,8 +637,11 @@ export function dayOptions(
 
   let entries: CalOption[] = [];
 
-  if (cal === 'gregory') {
-    const y = Number(yearKey);
+  if (cal === 'gregory' || cal === 'juche') {
+    // juche yearKey = "juche|NN"，需还原公历年
+    const y = cal === 'juche'
+      ? Number(yearKey.split('|')[1]) + 1911
+      : Number(yearKey);
     const m = Number(monthKey);
     const days = new Date(y, m, 0).getDate();
     entries = Array.from({ length: days }, (_, i) => ({ key: String(i + 1), display: String(i + 1) }));
@@ -644,8 +715,11 @@ export function dayOptions(
 
 /** 历法键 → 公历 Date（本地零点），无效返回 null */
 export function gregorianFromKeys(sel: DateSelection, cal: CalendarId): Date | null {
-  if (cal === 'gregory') {
-    const y = Number(sel.yearKey);
+  if (cal === 'gregory' || cal === 'juche') {
+    // juche yearKey = "juche|NN"，需还原公历年
+    const y = cal === 'juche'
+      ? Number(sel.yearKey.split('|')[1]) + 1911
+      : Number(sel.yearKey);
     const m = Number(sel.monthKey);
     const d = Number(sel.dayKey);
     if (!y || !m || !d) return null;
@@ -734,8 +808,11 @@ export function monthCalendarDays(
   const days = dayOptions(cal, yearKey, monthKey, displayLocale);
   if (days.length === 0) return [];
 
-  if (cal === 'gregory') {
-    const y = Number(yearKey);
+  if (cal === 'gregory' || cal === 'juche') {
+    // juche yearKey = "juche|NN"，需还原公历年
+    const y = cal === 'juche'
+      ? Number(yearKey.split('|')[1]) + 1911
+      : Number(yearKey);
     const m = Number(monthKey);
     return days.map((d, i) => ({ dayKey: d.key, dayDisplay: d.display, greg: new Date(y, m - 1, i + 1) }));
   }
@@ -768,7 +845,15 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
   const date = new Date(y, m - 1, d);
   if (Number.isNaN(date.getTime())) return dateISO;
 
-  if (cal === 'gregory') {
+  if (cal === 'gregory' || cal === 'juche') {
+    if (cal === 'juche') {
+      const jucheYear = y - 1911;
+      const era = eraName('juche', displayLocale);
+      const monthName = fmt(displayLocale, 'gregory', { month: 'long' }).format(date);
+      return displayLocale.startsWith('zh')
+        ? `${era}${jucheYear}年${m}月${d}日`
+        : `${monthName} ${d}, ${jucheYear} ${era}`;
+    }
     return fmt(displayLocale, 'gregory', { year: 'numeric', month: 'long', day: 'numeric' }).format(date);
   }
   if (cal === 'chinese') {
@@ -783,6 +868,14 @@ export function formatEventDate(dateISO: string, cal: CalendarId, displayLocale:
     const era = eraName('hebrew', displayLocale);
     const yearNum = k.yearKey.split('|')[1] ?? '';
     const mNum = hebrewMonthNum(k.monthKey, k.yearKey);
+    return `${era}${yearNum}年${Number.isNaN(mNum) ? k.monthKey : mNum}月${k.dayKey}日`;
+  }
+  // 埃塞俄比亚历 / 科普特历 / 民国纪年 中文数字式展示
+  if (displayLocale.startsWith('zh') && (cal === 'ethiopic' || cal === 'ethiopic-amete-alem' || cal === 'coptic' || cal === 'roc')) {
+    const k = keysFromGregorian(date, cal);
+    const era = eraName(cal, displayLocale);
+    const yearNum = k.yearKey.split('|')[1] ?? '';
+    const mNum = calMonthOrdinal(cal, k.monthKey, k.yearKey);
     return `${era}${yearNum}年${Number.isNaN(mNum) ? k.monthKey : mNum}月${k.dayKey}日`;
   }
   const parts = fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric' }).formatToParts(date);
@@ -826,7 +919,16 @@ export function weekdaySuffix(dateISO: string, displayLocale: string, mode: Week
  * 从「该年月份枚举顺序」取 1-based 序号。
  */
 function hebrewMonthNum(monthKey: string, yearKey: string): number {
-  const months = monthOptions('hebrew', yearKey, 'zh-CN') as MonthEntry[];
+  return calMonthOrdinal('hebrew', monthKey, yearKey);
+}
+
+/**
+ * 通用：某历法某年某月的序号（1-based），从该年月份枚举顺序取。
+ * 用于中文数字式日期展示（如希伯来历、埃塞俄比亚历、科普特历等，
+ * 其 Intl 月份名在中文 locale 下可能不可用或为英文）。
+ */
+function calMonthOrdinal(cal: CalendarId, monthKey: string, yearKey: string): number {
+  const months = monthOptions(cal, yearKey, 'zh-CN') as MonthEntry[];
   const idx = months.findIndex((m) => m.key === monthKey);
   return idx < 0 ? NaN : idx + 1;
 }
@@ -848,20 +950,42 @@ export function formatYearMonthHeader(
   }
 
   if (!displayLocale.startsWith('zh')) {
+    // juche 底层用 gregory，但需要显示主体历纪元名
+    if (cal === 'juche') {
+      const jucheYear = Number(yearKey.split('|')[1]);
+      const me = (monthOptions(cal, yearKey, displayLocale) as MonthEntry[]).find((e) => e.key === monthKey);
+      if (!me) return '';
+      const monthName = fmt(displayLocale, 'gregory', { month: 'long' }).format(me.firstSeen);
+      return `${monthName} ${jucheYear} ${eraName('juche', displayLocale)}`;
+    }
     const months = monthOptions(cal, yearKey, displayLocale) as MonthEntry[];
     const me = months.find((e) => e.key === monthKey);
     if (!me) return '';
     return fmt(displayLocale, cal, { year: 'numeric', month: 'long', era: 'short' }).format(me.firstSeen);
   }
 
-  if (cal === 'gregory') {
+  if (cal === 'gregory' || cal === 'juche') {
+    // juche yearKey = "juche|NN"
+    if (cal === 'juche') {
+      const jucheYear = yearKey.split('|')[1] ?? '';
+      const era = eraName('juche', 'zh-CN');
+      return `${era}${jucheYear}年${monthKey}月`;
+    }
     return `${yearKey}年${monthKey}月`;
   }
 
   if (cal === 'hebrew') {
     const era = eraName('hebrew', 'zh-CN');
     const yearNum = yearKey.split('|')[1] ?? '';
-    const m = hebrewMonthNum(monthKey, yearKey);
+    const m = calMonthOrdinal('hebrew', monthKey, yearKey);
+    return `${era}${yearNum}年${Number.isNaN(m) ? monthKey : m}月`;
+  }
+
+  // 埃塞俄比亚历 / 科普特历 / 民国纪年 中文数字式表头
+  if (cal === 'ethiopic' || cal === 'ethiopic-amete-alem' || cal === 'coptic' || cal === 'roc') {
+    const era = eraName(cal, 'zh-CN');
+    const yearNum = yearKey.split('|')[1] ?? '';
+    const m = calMonthOrdinal(cal, monthKey, yearKey);
     return `${era}${yearNum}年${Number.isNaN(m) ? monthKey : m}月`;
   }
 

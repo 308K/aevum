@@ -1,7 +1,7 @@
 /**
  * 全局设置存储（localStorage 持久化 + 订阅通知）
  */
-import { DEFAULT_SETTINGS, type AevumSettings, defaultDayOverflow, defaultLeapMonthStrategy } from '../types.js';
+import { DEFAULT_SETTINGS, migrateCalendarId, type AevumSettings, defaultDayOverflow, defaultLeapMonthStrategy } from '../types.js';
 
 const STORAGE_KEY = 'aevum.settings.v1';
 
@@ -46,6 +46,8 @@ function load(): AevumSettings {
         const navLocale = (navigator.language || 'zh-CN');
         merged.leapMonthStrategy = defaultLeapMonthStrategy(navLocale);
       }
+      // 迁移旧版历法 ID（如 'islamic' → 'islamic-umalqura'）
+      merged.defaultCalendar = migrateCalendarId(String(merged.defaultCalendar));
       return merged;
     }
   } catch {

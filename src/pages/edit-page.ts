@@ -28,14 +28,24 @@ import '../components/date-calendar.js';
 /** 新建标签使用的默认颜色（可在设置页改色） */
 const NEW_TAG_COLOR = '#5B5791';
 
-const CAL_I18N_KEYS: Record<CalendarId, 'calGregory' | 'calChinese' | 'calIslamic' | 'calHebrew' | 'calPersian' | 'calBuddhist' | 'calJapanese'> = {
+const CAL_I18N_KEYS: Record<CalendarId, string> = {
   gregory: 'calGregory',
   chinese: 'calChinese',
-  islamic: 'calIslamic',
+  'islamic-umalqura': 'calIslamicUmalqura',
+  'islamic-civil': 'calIslamicCivil',
+  'islamic-tbla': 'calIslamicTbla',
+  'islamic-rgsa': 'calIslamicRgsa',
   hebrew: 'calHebrew',
   persian: 'calPersian',
   buddhist: 'calBuddhist',
   japanese: 'calJapanese',
+  roc: 'calRoc',
+  indian: 'calIndian',
+  ethiopic: 'calEthiopic',
+  'ethiopic-amete-alem': 'calEthiopicAmeteAlem',
+  coptic: 'calCoptic',
+  dangi: 'calDangi',
+  juche: 'calJuche',
 };
 
 const GRAN_I18N_KEYS: Record<Granularity, 'granDay' | 'granDhms' | 'granYmd' | 'granYwd' | 'granWd'> = {
@@ -517,7 +527,7 @@ export class EditPage extends LitElement {
         >
           ${CALENDAR_IDS.map(
             (cal) => html`<md-select-option value=${cal}>
-              <div slot="headline">${t(CAL_I18N_KEYS[cal])}</div>
+              <div slot="headline">${t(CAL_I18N_KEYS[cal] as never)}</div>
             </md-select-option>`
           )}
         </md-outlined-select>

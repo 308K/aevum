@@ -94,7 +94,7 @@ export function getTemporalForCalendar(calId: string): typeof PolyfillTemporalTy
  */
 function needsPolyfill(): boolean {
   if (!_native) return true;
-  const cals = ['gregory', 'chinese', 'islamic-umalqura', 'hebrew', 'persian', 'buddhist', 'japanese'];
+  const cals = ['gregory', 'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'islamic-rgsa', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi'];
   return cals.some((c) => !nativeSupportsCalendar(c));
 }
 

@@ -39,7 +39,7 @@ function check(name: string, got: unknown, want: unknown) {
 console.log(`\n[DST 回归] 运行环境时区: ${tz}`);
 console.log('  要在实行夏令时的时区验证，请运行： TZ=America/New_York bun scripts/smoke-dst.ts');
 
-const NON_GREG: CalendarId[] = ['chinese', 'islamic', 'hebrew', 'persian', 'buddhist', 'japanese'];
+const NON_GREG: CalendarId[] = ['chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'islamic-rgsa', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi', 'juche'];
 
 // 1) 日历网格：相邻单元格的公历日期必须恰好相差 1 个日历日（DST 安全的核心不变量）
 for (const cal of NON_GREG) {

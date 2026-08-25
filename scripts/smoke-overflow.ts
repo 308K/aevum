@@ -21,7 +21,7 @@ console.log(`== 循环事件策略验证（${impl} Temporal）==\n`);
 const mk = (date: string, recurrence: AevumEvent['recurrence'], calendar: AevumEvent['calendar'] = 'gregory', time?: string): AevumEvent => ({ id: 't', name: 't', date, calendar, recurrence, granularity: 'day', tags: [], pinned: false, createdAt: 0, time });
 const at = (iso: string, h = 0, m = 0): number => { const [y, mo, d] = iso.split('-').map(Number); return new Date(y, mo - 1, d, h, m, 0).getTime(); };
 const strat = (so: DayOverflow = 'lastDay', ll: LeapMonthStrategy = 'nonLeap') => ({ dayOverflow: so, leapMonthStrategy: ll });
-const calIdOf = (id: CalendarId) => id === 'islamic' ? 'islamic-umalqura' : id;
+const calIdOf = (id: CalendarId) => id === 'juche' ? 'gregory' : id;
 const pdOf = (calId: string, iso: string) => { const T = getTemporalForCalendar(calId); const [y, m, d] = iso.split('-').map(Number); return T.PlainDate.from({ year: y, month: m, day: d }).withCalendar(calId); };
 const monthCodeOf = (calId: string, iso: string) => pdOf(calId, iso).monthCode;
 const dayOf = (calId: string, iso: string) => pdOf(calId, iso).day;
@@ -32,11 +32,21 @@ const isoOfPd = (pd: any) => { const g = pd.withCalendar('gregory'); const p = (
 const CALS: { id: CalendarId; anchorIso: string; label: string }[] = [
   { id: 'gregory', anchorIso: '2025-03-15', label: '公历' },
   { id: 'chinese', anchorIso: '2025-02-17', label: '农历' },
-  { id: 'islamic', anchorIso: '2025-07-31', label: '伊斯兰历' },
+  { id: 'islamic-umalqura', anchorIso: '2025-07-31', label: '伊斯兰历(乌姆库拉)' },
+  { id: 'islamic-civil', anchorIso: '2025-07-31', label: '伊斯兰历(民用)' },
+  { id: 'islamic-tbla', anchorIso: '2025-07-31', label: '伊斯兰历(天文表算)' },
+  { id: 'islamic-rgsa', anchorIso: '2025-07-31', label: '伊斯兰历(沙特观月)' },
   { id: 'hebrew', anchorIso: '2025-09-23', label: '希伯来历' },
   { id: 'persian', anchorIso: '2025-03-21', label: '波斯历' },
   { id: 'buddhist', anchorIso: '2025-01-01', label: '佛教历' },
   { id: 'japanese', anchorIso: '2025-01-01', label: '日本和历' },
+  { id: 'roc', anchorIso: '2025-01-01', label: '民国纪年' },
+  { id: 'indian', anchorIso: '2025-04-14', label: '印度国家历' },
+  { id: 'ethiopic', anchorIso: '2025-01-01', label: '埃塞俄比亚历' },
+  { id: 'ethiopic-amete-alem', anchorIso: '2025-01-01', label: '埃塞俄比亚历(Amete Alem)' },
+  { id: 'coptic', anchorIso: '2025-01-01', label: '科普特历' },
+  { id: 'dangi', anchorIso: '2025-01-29', label: '韩国农历' },
+  { id: 'juche', anchorIso: '2025-01-01', label: '主体历' },
 ];
 
 // ============ A. 公历年循环 2/29 × dayOverflow ============
@@ -160,7 +170,7 @@ console.log('\n== I. 伊斯兰历 monthly 月长变化（29/30交替）==');
   const anchorIso = isoOfPd(anchorPd);
   // 推进2个月，验证 day 一致或收敛
   const futureIso = isoPlusDays(anchorIso, 70);
-  const result = nextOccurrenceDate(mk(anchorIso, 'monthly', 'islamic'), at(futureIso), 0, strat('lastDay'));
+  const result = nextOccurrenceDate(mk(anchorIso, 'monthly', 'islamic-umalqura'), at(futureIso), 0, strat('lastDay'));
   const resultDay = dayOf(calId, result);
   const resultDim = daysInMonthOf(calId, result);
   console.log(`  结果: day=${resultDay}, daysInMonth=${resultDim}, monthCode=${monthCodeOf(calId, result)}`);

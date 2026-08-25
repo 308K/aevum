@@ -10,6 +10,7 @@ import { getTags, replaceTags, normalizeEventTags } from '../store/tags.js';
 import { getSettings, updateSettings } from '../store/settings.js';
 import { CALENDAR_IDS } from './calendar.js';
 import { Temporal } from './temporal.js';
+import { migrateCalendarId } from '../types.js';
 
 const GRANULARITIES: Granularity[] = ['day', 'dhms', 'ymd', 'ywd', 'wd'];
 const RECURRENCES: Recurrence[] = ['none', 'weekly', 'monthly', 'yearly'];
@@ -58,7 +59,10 @@ function sanitizeEvent(raw: unknown): AevumEvent | null {
   if (m < 1 || m > 12 || d < 1 || d > 31 || y < 1) return null;
 
   const time = typeof r.time === 'string' && /^\d{2}:\d{2}$/.test(r.time) ? r.time : undefined;
-  const calendar = CALENDAR_IDS.includes(r.calendar as CalendarId) ? (r.calendar as CalendarId) : 'gregory';
+  // 旧备份中的 'islamic' 迁移为 'islamic-umalqura'；非法历法回退公历
+  const calendar = CALENDAR_IDS.includes(r.calendar as CalendarId)
+    ? (r.calendar as CalendarId)
+    : (CALENDAR_IDS.includes(migrateCalendarId(String(r.calendar))) ? migrateCalendarId(String(r.calendar)) : 'gregory');
   const granularity = GRANULARITIES.includes(r.granularity as Granularity)
     ? (r.granularity as Granularity)
     : 'day';
