@@ -96,7 +96,7 @@ export class ShareImagePage extends LitElement {
       align-items: center;
       gap: 14px;
     }
-    /* 「从背景图取色」提取到的种子色色点 */
+    /* 「从背景图取色」提取到的种子色色点（hidden 时仅占位，避免开关位移） */
     .seed-dot {
       flex: none;
       width: 24px;
@@ -104,6 +104,11 @@ export class ShareImagePage extends LitElement {
       border-radius: 50%;
       border: 1px solid color-mix(in oklch, var(--md-sys-color-outline-variant) 70%, transparent);
       box-shadow: 0 1px 4px color-mix(in oklch, var(--md-sys-color-shadow) 25%, transparent);
+      transition: background 0.2s ease;
+    }
+    .seed-dot.hidden {
+      visibility: hidden;
+      box-shadow: none;
     }
     .color-dot {
       flex: none;
@@ -462,20 +467,22 @@ export class ShareImagePage extends LitElement {
                       <div class="label">${t('shareImageAutoTheme')}</div>
                       <div class="control">
                         <div class="auto-theme-row">
-                          ${this.autoTheme && this.dynSeed
-                            ? html`<span
-                                class="seed-dot"
-                                style="background: ${this.dynSeed}"
-                                role="img"
-                                title=${this.dynSeed}
-                                aria-label=${this.dynSeed}
-                              ></span>`
-                            : ''}
                           <md-switch
                             ?selected=${this.autoTheme}
                             @change=${this.onAutoThemeChange}
                             aria-label=${t('shareImageAutoTheme')}
                           ></md-switch>
+                          ${(() => {
+                            const showSeed = this.autoTheme && !!this.dynSeed;
+                            return html`<span
+                              class="seed-dot ${showSeed ? '' : 'hidden'}"
+                              style="background: ${showSeed ? this.dynSeed! : 'transparent'}"
+                              role="img"
+                              title=${showSeed ? this.dynSeed! : ''}
+                              aria-label=${showSeed ? this.dynSeed! : ''}
+                              aria-hidden=${showSeed ? 'false' : 'true'}
+                            ></span>`;
+                          })()}
                         </div>
                       </div>
                     </div>`
