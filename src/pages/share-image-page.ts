@@ -10,6 +10,7 @@ import '@material/web/button/filled-button.js';
 import '@material/web/button/outlined-button.js';
 import '@material/web/iconbutton/icon-button.js';
 import '@material/web/slider/slider.js';
+import '@material/web/switch/switch.js';
 import type { MdOutlinedSelect } from '@material/web/select/outlined-select.js';
 import type { AevumEvent, WeekdayDisplay } from '../types.js';
 import { getEvents, getEvent, onEventsChange, sortedEvents } from '../store/events.js';
@@ -17,7 +18,7 @@ import { getSettings, updateSettings, PRESET_SEED_COLORS } from '../store/settin
 import { onLocaleChange, t } from '../i18n.js';
 import { icon } from '../icons.js';
 import { resolveDark } from '../theme.js';
-import { drawShareImage, saveEventShareImage, copyEventShareImageToClipboard, type CardStyle, W, H } from '../utils/share-image.js';
+import { drawShareImage, saveEventShareImage, copyEventShareImageToClipboard, getBgSeedColor, type CardStyle, W, H } from '../utils/share-image.js';
 import { toast } from '../components/app-snackbar.js';
 import '../components/color-picker.js';
 
@@ -84,6 +85,25 @@ export class ShareImagePage extends LitElement {
       gap: 12px;
       justify-content: flex-end;
       flex-wrap: wrap;
+    }
+    /* 从背景图取色开启时，手动主题色降显并禁用交互 */
+    .color-row.dimmed {
+      opacity: 0.45;
+      pointer-events: none;
+    }
+    .auto-theme-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    /* 「从背景图取色」提取到的种子色色点 */
+    .seed-dot {
+      flex: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      border: 1px solid color-mix(in oklch, var(--md-sys-color-outline-variant) 70%, transparent);
+      box-shadow: 0 1px 4px color-mix(in oklch, var(--md-sys-color-shadow) 25%, transparent);
     }
     .color-dot {
       flex: none;
@@ -233,6 +253,10 @@ export class ShareImagePage extends LitElement {
   @state() private saving = false;
   @state() private copying = false;
   @state() private weekday: WeekdayDisplay = getSettings().shareWeekdayDisplay;
+  /** 有背景图的事件默认开启「从背景图取色」（Material 动态取色派生主题） */
+  @state() private autoTheme = true;
+  /** 当前事件背景图提取到的种子色（无背景图或提取失败为 null） */
+  @state() private dynSeed: string | null = null;
 
   @query('#preview') private previewCanvas!: HTMLCanvasElement;
 
@@ -259,6 +283,9 @@ export class ShareImagePage extends LitElement {
   }
 
   updated(changed: Map<string, unknown>) {
+    if (changed.has('eventId')) {
+      void this.updateDynSeed();
+    }
     if (
       changed.has('eventId') ||
       changed.has('seedColor') ||
@@ -266,7 +293,8 @@ export class ShareImagePage extends LitElement {
       changed.has('cardStyle') ||
       changed.has('cardIntensity') ||
       changed.has('cardOpacity') ||
-      changed.has('weekday')
+      changed.has('weekday') ||
+      changed.has('autoTheme')
     ) {
       this.renderPreview();
     }
@@ -281,6 +309,7 @@ export class ShareImagePage extends LitElement {
       cardOpacity: this.cardOpacity,
       darkenBg: false,
       weekday: this.weekday,
+      dynamicTheme: this.autoTheme,
     };
   }
 
@@ -319,6 +348,16 @@ export class ShareImagePage extends LitElement {
 
   private onColorChange(e: CustomEvent<{ value: string }>) {
     this.seedColor = e.detail.value;
+  }
+
+  private onAutoThemeChange(e: Event) {
+    this.autoTheme = (e.target as HTMLElement & { selected: boolean }).selected;
+  }
+
+  /** 切换事件时提取其背景图种子色（与绘制共用缓存），供开关旁的色点展示 */
+  private async updateDynSeed() {
+    const src = this.selectedEvent?.bgImage;
+    this.dynSeed = src ? await getBgSeedColor(src) : null;
   }
 
   private onWeekdayChange(e: Event) {
@@ -392,7 +431,10 @@ export class ShareImagePage extends LitElement {
                 <div class="item">
                   <div class="label">${t('shareImageThemeColor')}</div>
                   <div class="control">
-                    <div class="color-row">
+                    <div
+                      class="color-row ${this.autoTheme && ev?.bgImage ? 'dimmed' : ''}"
+                      aria-disabled=${this.autoTheme && !!ev?.bgImage ? 'true' : 'false'}
+                    >
                       <div class="swatches">
                         ${PRESET_SEED_COLORS.map(
                           (c) => html`<button
@@ -414,6 +456,30 @@ export class ShareImagePage extends LitElement {
                     </div>
                   </div>
                 </div>
+
+                ${ev?.bgImage
+                  ? html`<div class="item">
+                      <div class="label">${t('shareImageAutoTheme')}</div>
+                      <div class="control">
+                        <div class="auto-theme-row">
+                          ${this.autoTheme && this.dynSeed
+                            ? html`<span
+                                class="seed-dot"
+                                style="background: ${this.dynSeed}"
+                                role="img"
+                                title=${this.dynSeed}
+                                aria-label=${this.dynSeed}
+                              ></span>`
+                            : ''}
+                          <md-switch
+                            ?selected=${this.autoTheme}
+                            @change=${this.onAutoThemeChange}
+                            aria-label=${t('shareImageAutoTheme')}
+                          ></md-switch>
+                        </div>
+                      </div>
+                    </div>`
+                  : ''}
 
                 <div class="item">
                   <div class="label">${t('shareImageBackgroundMode')}</div>

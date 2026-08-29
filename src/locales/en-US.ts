@@ -213,6 +213,7 @@ export const enUS: LocaleDict = {
   shareImageEvent: 'Choose event',
   shareImageSectionStyle: 'Style',
   shareImageThemeColor: 'Theme color',
+  shareImageAutoTheme: 'Theme from image',
   shareImageBackgroundMode: 'Background',
   shareImageBgLight: 'Light',
   shareImageBgDark: 'Dark',

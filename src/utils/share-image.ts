@@ -1,7 +1,9 @@
 /**
  * 事件分享卡片：Canvas 2D 手绘 PNG（不依赖 DOM 截图，Shadow DOM 兼容）
- * 配色由「种子色 + 亮暗」独立派生（不依赖当前页面主题），支持自定义背景图与不压暗、卡片覆盖（不透明/半透明/高斯模糊）
+ * 配色由「种子色 + 亮暗」独立派生（不依赖当前页面主题），支持自定义背景图与不压暗、卡片覆盖（不透明/半透明/高斯模糊）。
+ * 事件带背景图时，默认用 Material 动态取色（Quantizer Celebi + Score）从背景图提取种子色派生整套配色。
  */
+import { QuantizerCelebi, Score, argbFromRgb, hexFromArgb } from '@material/material-color-utilities';
 import type { AevumEvent, WeekdayDisplay } from '../types.js';
 import { getSettings } from '../store/settings.js';
 import { computeDiff, parseBoundary, effectiveEvent } from './time-calc.js';
@@ -36,6 +38,8 @@ export interface ShareImageOptions {
   darkenBg: boolean;
   /** 星期显示：关闭 / 短 / 长（分享图页可独立设置） */
   weekday: WeekdayDisplay;
+  /** 事件带背景图时是否从背景图动态取色派生主题（Material dynamic color；默认 true） */
+  dynamicTheme: boolean;
 }
 
 interface SchemeColors {
@@ -110,6 +114,48 @@ function loadImage(src: string): Promise<HTMLImageElement | null> {
   });
 }
 
+/** 背景图取色缓存（src → 种子色 hex；失败也缓存 null，避免重复量化） */
+const bgSeedCache = new Map<string, Promise<string | null>>();
+
+/**
+ * 从图片提取 Material 动态取色种子色：与官方 sourceColorFromImage 同算法
+ * （Quantizer Celebi 量化 + Score 排序），但先降采样到最长边 ≤112px 再量化，
+ * 避免整图 getImageData / 量化的开销（预览随滑杆频繁重绘）。
+ */
+function extractSeedColor(img: HTMLImageElement, src: string): Promise<string | null> {
+  const cached = bgSeedCache.get(src);
+  if (cached) return cached;
+  const p = new Promise<string | null>((resolve) => {
+    try {
+      const maxSide = 112;
+      const iw = img.width || 1;
+      const ih = img.height || 1;
+      const scale = Math.min(1, maxSide / Math.max(iw, ih));
+      const w = Math.max(1, Math.round(iw * scale));
+      const h = Math.max(1, Math.round(ih * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return resolve(null);
+      ctx.drawImage(img, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h).data;
+      const pixels: number[] = [];
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i + 3] < 255) continue; // 跳过半透明像素（与官方实现一致）
+        pixels.push(argbFromRgb(data[i], data[i + 1], data[i + 2]));
+      }
+      if (pixels.length === 0) return resolve(null);
+      const top = Score.score(QuantizerCelebi.quantize(pixels, 128))[0];
+      resolve(typeof top === 'number' ? hexFromArgb(top) : null);
+    } catch {
+      resolve(null);
+    }
+  });
+  bgSeedCache.set(src, p);
+  return p;
+}
+
 /** 等比 cover 绘制：把图片铺满 (x,y,w,h) 区域（溢出裁切） */
 function drawCover(
   ctx: CanvasRenderingContext2D,
@@ -153,6 +199,7 @@ function normalizeOptions(opts?: Partial<ShareImageOptions>): ShareImageOptions 
     cardOpacity: opts?.cardOpacity ?? 0.5,
     darkenBg: opts?.darkenBg ?? false,
     weekday: opts?.weekday ?? s.shareWeekdayDisplay,
+    dynamicTheme: opts?.dynamicTheme ?? true,
   };
 }
 
@@ -172,10 +219,12 @@ export async function drawShareImage(
   if (!ctx) throw new Error('canvas-2d-unavailable');
   ctx.clearRect(0, 0, W, H);
 
-  const colors = resolveScheme(options.themeColor, options.dark);
-
   // —— 背景：事件背景图（铺底，不压暗）或 OKLCH 风格渐变 ——
   const bgImg = ev.bgImage ? await loadImage(ev.bgImage) : null;
+  // 背景图动态取色：从背景图提取种子色派生整套 M3 配色（提取失败回退用户主题色）
+  const dynSeed =
+    bgImg && ev.bgImage && options.dynamicTheme ? await extractSeedColor(bgImg, ev.bgImage) : null;
+  const colors = resolveScheme(dynSeed ?? options.themeColor, options.dark);
   if (bgImg) {
     drawCover(ctx, bgImg, 0, 0, W, H);
     // 仅在用户显式要求（旧行为）时才压暗背景图；默认保留原色，可读性由卡片覆盖保证
@@ -376,6 +425,16 @@ export async function drawShareImage(
   ctx.textAlign = 'left';
   ctx.fillText(domainText, groupX + iconSize + iconGap, domainY);
   ctx.textAlign = 'center';
+}
+
+/**
+ * 提取（并缓存）背景图种子色，供分享图页在「从背景图取色」开关旁展示取色结果。
+ * 与 drawShareImage 内部共用同一份缓存，不产生重复量化。
+ */
+export async function getBgSeedColor(src: string): Promise<string | null> {
+  const img = await loadImage(src);
+  if (!img) return null;
+  return extractSeedColor(img, src);
 }
 
 /** 生成分享图并触发下载 */

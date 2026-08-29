@@ -222,6 +222,7 @@ export const zhCN = {
   shareImageEvent: '选择事件',
   shareImageSectionStyle: '样式',
   shareImageThemeColor: '主题色',
+  shareImageAutoTheme: '从背景图取色',
   shareImageBackgroundMode: '背景',
   shareImageBgLight: '亮色',
   shareImageBgDark: '暗色',
