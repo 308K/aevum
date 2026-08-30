@@ -80,3 +80,8 @@ export function onSettingsChange(fn: Listener): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
+
+/** 仅供测试：重置内存缓存使其重新从 localStorage 加载 */
+export function __resetForTesting(): void {
+  settings = load();
+}

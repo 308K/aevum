@@ -99,6 +99,11 @@ export function onTagsChange(fn: Listener): () => void {
   return () => listeners.delete(fn);
 }
 
+/** 仅供测试：重置内存缓存使其重新从 localStorage 加载 */
+export function __resetForTesting(): void {
+  tags = load();
+}
+
 /** 显示名：内置标签存 i18n key，统一用 t() 解析；普通字符串原样返回 */
 export function tagDisplay(tag: TagDef): string {
   return t(tag.label as keyof LocaleDict);

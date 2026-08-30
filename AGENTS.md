@@ -53,3 +53,13 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 - `bun scripts/smoke-backup.ts` —— 备份导入清洗。
 - `bun scripts/smoke-recur.ts` —— 循环事件回归（日本和历改元边界：昭和 12 月起始 / 平成正月起始 / 令和年中起始，monthly/yearly/weekly/精确时间，约 18 条断言）。也可用 Deno 原生 Temporal 跑（`deno run --no-prompt --allow-read --allow-env scripts/smoke-recur.ts`）。
 修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑对应脚本。
+
+## Vitest 测试
+项目已引入 **Vitest** 作为自动化测试框架，测试文件位于 `tests/` 目录：
+- `bun run test` —— 单次运行全部测试（351 条断言，约 1.3s）
+- `bun run test:watch` —— watch 模式
+- `bun run test:coverage` —— 带覆盖率报告
+- `tests/setup.ts` —— 注入 localStorage / navigator 垫片（node 环境无全局 localStorage）
+- Store 模块（`events.ts` / `settings.ts` / `tags.ts`）导出 `__resetForTesting()` 用于 `beforeEach` 重置内存缓存
+- 原 `scripts/smoke-*.ts` 保留不动，其中 `smoke-temporal.ts` 仍需用 Deno 原生 Temporal 跑交叉验证
+- **GitHub Actions CI**（`.github/workflows/ci.yml`）：push/PR 时自动运行 `bun install --frozen-lockfile` → `bun run typecheck` → `bun run test`

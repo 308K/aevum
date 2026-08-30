@@ -102,6 +102,11 @@ export function onEventsChange(fn: Listener): () => void {
   return () => listeners.delete(fn);
 }
 
+/** 仅供测试：重置内存缓存使其重新从 localStorage 加载 */
+export function __resetForTesting(): void {
+  events = load();
+}
+
 /** 排序：置顶优先，其次按目标日期升序（未来近者在前）
  *  循环事件使用「下一次发生日期」参与排序，避免锚点（可能是过去）乱序 */
 export function sortedEvents(list: AevumEvent[]): AevumEvent[] {
