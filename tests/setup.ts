@@ -23,4 +23,8 @@ if (typeof (globalThis as any).navigator === 'undefined') {
   (globalThis as any).navigator = { language: 'zh-CN', userAgent: 'vitest' };
 }
 
+// 强制 i18n 使用中文，避免 CI 环境 navigator.language 为 en-US
+import { __setLocaleForTesting } from '../src/i18n.js';
+__setLocaleForTesting('zh-CN');
+
 export {};

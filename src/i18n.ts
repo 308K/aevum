@@ -48,6 +48,11 @@ export function onLocaleChange(fn: Listener): () => void {
   return () => listeners.delete(fn);
 }
 
+/** 仅供测试：强制设置当前语言 */
+export function __setLocaleForTesting(locale: Locale): void {
+  currentLocale = locale;
+}
+
 /** 翻译 + 简单参数插值：t('deleteConfirmBody', {name: '高考'}) */
 export function t(key: keyof LocaleDict, params?: Record<string, string | number>): string {
   let text: string = DICTS[currentLocale][key] ?? DICTS['zh-CN'][key] ?? String(key);
