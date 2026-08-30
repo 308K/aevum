@@ -2,6 +2,7 @@
 
 > 极简优雅的倒数日 PWA —— 纯前端、可离线、支持多历法与多粒度时间展示。
 
+[![CI](https://img.shields.io/github/actions/workflow/status/308K/aevum/ci.yml?branch=main&style=flat-square&label=CI)](https://github.com/308K/aevum/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/308K/aevum?style=flat-square)](./LICENSE)
 [![Last Commit](https://img.shields.io/github/last-commit/308K/aevum?style=flat-square)](https://github.com/308K/aevum/commits)
 [![Repo Size](https://img.shields.io/github/repo-size/308K/aevum?style=flat-square)](https://github.com/308K/aevum)
@@ -11,7 +12,7 @@
 [![Lit](https://img.shields.io/badge/Lit-3.2-324FFF?style=flat-square&logo=lit&logoColor=white)](https://lit.dev/)
 [![Material 3](https://img.shields.io/badge/Material%203-M3-6750A4?style=flat-square)](https://m3.material.io/)
 [![PWA](https://img.shields.io/badge/PWA-ready-5A0FC8?style=flat-square)](https://vite-pwa-org.netlify.app/)
-[![Bun](https://img.shields.io/badge/Bun-1.2-000000?style=flat-square&logo=bun&logoColor=white)](https://bun.sh/)
+[![Bun](https://img.shields.io/badge/Bun-1.4-000000?style=flat-square&logo=bun&logoColor=white)](https://bun.sh/)
 
 ---
 
@@ -20,8 +21,8 @@
 ### 核心功能
 
 - **倒数日**：记录重要日期，自动计算距离今天的天数（未来倒数 / 过去已历 / 今日）。
-- **循环事件**：支持不循环 / 每周 / 每月 / 每年，自动推算下一次发生日。
-- **多历法**：基于原生 `Intl` API，支持公历、农历、伊斯兰历、希伯来历、波斯历、佛历、日本和历共 7 种，无需重型日期库。
+- **循环事件**：支持不循环 / 每周 / 每月 / 每年，自动推算下一次发生日；可配置日不存在时的溢出策略（RFC 5545 跳过 / 月末收敛 / 次月顺延）与闰月策略（从正不从闰 / 严格闰月 / 平闰皆可）。
+- **多历法**：基于 TC39 Temporal API + `Intl`，支持公历、农历、伊斯兰历（乌姆库拉/民用/天文表算/沙特观月）、希伯来历、波斯历、佛历、日本和历、民国纪年、印度国家历、埃塞俄比亚历、科普特历、韩国农历、主体历共 17 种，无需重型日期库。
 - **多粒度时间展示**：天 / 天-时-分-秒 / 年月日 / 年周天 / 周天 多种呈现。
 - **精确时间**：可设置目标时刻（HH:MM），配合「天-时-分-秒」粒度精确到秒。
 - **自定义日界限**：设置一天从何时开始（如 `04:00`），影响"今天"的判定。
@@ -41,7 +42,7 @@
 ### 体验
 
 - **中英文界面**：跟随系统或手动切换，词典式 i18n。
-- **无障碍**：日历式日期选择器支持键盘导航（方向键 / Home / End / PageUp·Down）与读屏语义（role=grid、sr-only 操作提示）；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
+- **无障碍**：日历式日期选择器支持键盘导航（方向键 / Home / End / PageUp·Down）与读屏语义（role=grid、sr-only 操作提示）；支持本地化周起始日与多历法月份切换；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
 - **PWA 离线可用**：可安装到主屏，无网络也能查看。
 
 ## 技术栈
@@ -51,16 +52,17 @@
 | 框架 | [Lit 3](https://lit.dev/) | Web Components，无虚拟 DOM 运行时 |
 | 组件库 | [@material/web](https://github.com/material-components/material-web) | Material 3 官方组件 |
 | 配色 | [material-color-utilities](https://github.com/material-foundation/material-color-utilities) | 由种子色动态生成 OKLCH 全套 M3 色阶 |
-| 日期/历法 | [TC39 Temporal API](https://tc39.es/proposal-temporal/) | 原生优先，按需回退 `@js-temporal/polyfill` |
+| 日期/历法 | [TC39 Temporal API](https://tc39.es/proposal-temporal/) | 原生优先，按需回退 `temporal-polyfill` |
 | 构建 | [Vite 5](https://vitejs.dev/) + [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) | 路由级代码分割 + Service Worker |
 | 语言 | [TypeScript](https://www.typescriptlang.org/) | 严格类型，`tsc --noEmit` 检查 |
+| 测试 | [Vitest](https://vitest.dev/) | 351 条断言，CI 集成 |
 | 包管理 | [Bun](https://bun.sh/) | 依赖安装与脚本运行 |
 
 ### 性能优化
 
-- **Temporal polyfill 按需加载**：有原生 Temporal 的浏览器（Chrome 141+）不下载 polyfill chunk（节省 ~44KB gzip）。
+- **Temporal polyfill 按需加载**：有原生 Temporal 的浏览器（Chrome 144+、Bun 1.4+）不下载 polyfill chunk（节省 ~44KB gzip）。
 - **路由级代码分割**：编辑页、设置页、分享图页均为懒加载 chunk，首屏仅加载主页。
-- **构建产物**：主 chunk ~89KB gzip，polyfill chunk ~44KB gzip（按需），路由 chunk 各 5–12KB gzip。
+- **构建产物**：主 chunk ~93KB gzip，polyfill chunk ~25KB gzip（按需），路由 chunk 各 5–12KB gzip。
 
 ## 本地开发
 
@@ -76,20 +78,21 @@ bun run preview    # 本地预览构建产物
 
 ## 测试
 
-项目无测试框架，回归靠冒烟脚本（纯逻辑、无 DOM）：
+项目使用 [Vitest](https://vitest.dev/) 作为自动化测试框架，351 条断言覆盖历法转换、时间计算、循环事件、主题管理、备份导入等核心逻辑：
 
 ```bash
-# Bun 环境（使用 @js-temporal/polyfill）
-bun scripts/smoke.ts          # 核心：历法往返 / 枚举 / 日界限 / 多粒度 / 年月表头（~68 条断言）
-bun scripts/smoke-themes.ts   # 自定义主题色：增 / 删 / 改 / 去重 / 回退
-bun scripts/smoke-dst.ts      # DST 安全：非公历相邻日进位与夏令时往返
-bun scripts/smoke-backup.ts   # 备份导入清洗：循环规则保留 / 设置类型校验
-
-# Deno 环境（原生 Temporal 兼容性验证）
-deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts
+bun run test          # 单次运行全部测试
+bun run test:watch    # watch 模式
+bun run test:coverage # 带覆盖率报告
 ```
 
-> 修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑对应脚本。
+GitHub Actions CI 在每次 push / PR 时自动运行 `typecheck` + `test`（[CI 状态](https://github.com/308K/aevum/actions/workflows/ci.yml)）。
+
+此外保留了一组 Deno 交叉验证脚本，用 Deno 原生 Temporal 验证与 Bun（polyfill）路径的一致性：
+
+```bash
+deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts
+```
 
 ## 部署
 
@@ -113,18 +116,26 @@ PWA（service worker + manifest）由 vite-plugin-pwa 自动生成，构建后�
 aevum/
 ├── index.html                  # 应用入口
 ├── vite.config.ts              # Vite + PWA 配置
+├── vitest.config.ts            # Vitest 测试配置
 ├── tsconfig.json               # TypeScript 配置（experimentalDecorators + !useDefineForClassFields）
 ├── package.json
 ├── LICENSE
+├── .github/workflows/ci.yml   # GitHub Actions CI（typecheck + test）
 ├── public/
 │   ├── icons/                  # PWA 图标（SVG）
 │   └── robots.txt
-├── scripts/                    # 冒烟测试脚本
-│   ├── smoke.ts                # 核心逻辑回归
+├── scripts/                    # Deno 交叉验证脚本
 │   ├── smoke-temporal.ts       # Deno 原生 Temporal 兼容性
-│   ├── smoke-themes.ts         # 主题色逻辑
-│   ├── smoke-dst.ts             # 夏令时进位
-│   └── smoke-backup.ts         # 备份导入清洗
+│   └── ...
+├── tests/                      # Vitest 自动化测试（351 条断言）
+│   ├── setup.ts                # 测试环境垫片（localStorage / navigator / i18n）
+│   ├── calendar.test.ts        # 历法转换 / 纪元 / 差值 / 循环 / 网格 / 表头
+│   ├── themes.test.ts          # 主题色增删改去重
+│   ├── backup.test.ts          # 备份导入清洗
+│   ├── dst.test.ts             # DST 回归（16 种非公历经法）
+│   ├── recur.test.ts           # 日本和历改元循环
+│   ├── era-transition.test.ts  # 改元边界枚举/往返
+│   └── overflow.test.ts        # 全历法循环策略（dayOverflow / leapMonthStrategy）
 └── src/
     ├── main.ts                 # 入口：全局样式 / M3 组件注册 / 设置初始化 / SW 注册
     ├── app.ts                  # 根组件 AevumApp：Top App Bar + 哈希路由 + FAB + Snackbar
@@ -210,6 +221,7 @@ AevumApp (app.ts) ── 哈希路由
 - 所有可见 UI 文案必须通过 `t(key)` 走 i18n，禁止硬编码
 - 图标使用 `src/icons.ts` 内联 SVG，禁止 emoji 或外部图标字体
 - 历法与时间计算一律走 TC39 Temporal API（通过 `src/utils/temporal.ts` 桥接），禁止引入重型日期库
+- 修改 `utils/calendar.ts`、`utils/time-calc.ts`、`store/` 后运行 `bun run test` 确保无回归
 - 主题色由种子色动态生成 M3 色阶，禁止硬编码色值覆盖动态主题
 - 新增语言须在 `src/locales/` 新建词典文件并注册到 `src/i18n.ts` 的 `DICTS`
 
