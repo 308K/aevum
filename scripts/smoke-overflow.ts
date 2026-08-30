@@ -5,6 +5,7 @@
  * 运行：bun scripts/smoke-overflow.ts
  */
 import { ensureTemporalReady, getTemporalForCalendar } from '../src/utils/temporal.ts';
+import { temporalCalId } from '../src/utils/calendar.ts';
 import { nextOccurrenceDate } from '../src/utils/time-calc.ts';
 import type { AevumEvent, CalendarId, DayOverflow, LeapMonthStrategy } from '../src/types.ts';
 
@@ -21,8 +22,9 @@ console.log(`== 循环事件策略验证（${impl} Temporal）==\n`);
 const mk = (date: string, recurrence: AevumEvent['recurrence'], calendar: AevumEvent['calendar'] = 'gregory', time?: string): AevumEvent => ({ id: 't', name: 't', date, calendar, recurrence, granularity: 'day', tags: [], pinned: false, createdAt: 0, time });
 const at = (iso: string, h = 0, m = 0): number => { const [y, mo, d] = iso.split('-').map(Number); return new Date(y, mo - 1, d, h, m, 0).getTime(); };
 const strat = (so: DayOverflow = 'lastDay', ll: LeapMonthStrategy = 'nonLeap') => ({ dayOverflow: so, leapMonthStrategy: ll });
-const calIdOf = (id: CalendarId) => id === 'juche' ? 'gregory' : id;
-const pdOf = (calId: string, iso: string) => { const T = getTemporalForCalendar(calId); const [y, m, d] = iso.split('-').map(Number); return T.PlainDate.from({ year: y, month: m, day: d }).withCalendar(calId); };
+// 与生产路径一致：经 temporalCalId 映射（juche→gregory、islamic-rgsa→islamic-umalqura）
+const calIdOf = (id: CalendarId) => temporalCalId(id);
+const pdOf = (calId: string, iso: string) => { const tid = temporalCalId(calId as CalendarId); const T = getTemporalForCalendar(tid); const [y, m, d] = iso.split('-').map(Number); return T.PlainDate.from({ year: y, month: m, day: d }).withCalendar(tid); };
 const monthCodeOf = (calId: string, iso: string) => pdOf(calId, iso).monthCode;
 const dayOf = (calId: string, iso: string) => pdOf(calId, iso).day;
 const daysInMonthOf = (calId: string, iso: string) => pdOf(calId, iso).daysInMonth;

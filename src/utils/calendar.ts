@@ -46,14 +46,18 @@ export interface CalOption {
  * 将应用层 CalendarId 映射为 Temporal 支持的日历标识符。
  * - 'juche'（主体历）在 Temporal/Intl 中不存在，底层使用 gregory 做日期运算，
  *   年份偏移在应用层处理（jucheYear = gregYear - 1911）
- * - 其他历法标识符在 Temporal 中与 Intl 一致
+ * - 'islamic-rgsa'（沙特观月）在主流原生 Temporal（V8/ICU：Chrome/Edge/Bun/Deno）
+ *   中不被支持（RangeError），且 @js-temporal/polyfill 对其静默透传（返回公历
+ *   原值，数据全错）。CLDR 中 rgsa 与 umalqura 使用同一份 Umm al-Qura 数据，
+ *   语义等价，故底层运算统一映射到 islamic-umalqura（存储键/显示名仍为 rgsa）。
  *
  * 注意：某些浏览器（如 Firefox 139-148）原生 Temporal 不支持 islamic-umalqura，
  * 这由 getTemporalForCalendar() 在 temporal.ts 中处理——按日历 ID 粒度选择
  * 原生或 polyfill 实现。
  */
-function temporalCalId(cal: CalendarId): string {
+export function temporalCalId(cal: CalendarId): string {
   if (cal === 'juche') return 'gregory';
+  if (cal === 'islamic-rgsa') return 'islamic-umalqura';
   return cal;
 }
 
@@ -106,10 +110,12 @@ const fmtCache = new Map<string, Intl.DateTimeFormat>();
 /**
  * Intl 日历标签映射。
  * - 'juche' 底层使用 gregory，Intl 标签为 gregory
- * - 其他历法标识符与 Intl 一致
+ * - 'islamic-rgsa' 底层运算已映射到 umalqura（见 temporalCalId），
+ *   展示层同样映射，保证显示与内部计算数据一致
  */
 function intlCalTag(cal: CalendarId): string {
   if (cal === 'juche') return 'gregory';
+  if (cal === 'islamic-rgsa') return 'islamic-umalqura';
   return cal;
 }
 

@@ -11,10 +11,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@js-temporal/polyfill": "^0.5.1",
     "@material/material-color-utilities": "^0.3.0",
     "@material/web": "^2.3.0",
-    "lit": "^3.2.1"
+    "lit": "^3.2.1",
+    "temporal-polyfill": "^1.0.4"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

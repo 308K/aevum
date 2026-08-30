@@ -13,20 +13,11 @@
  * - 逻辑日序号仍基于时间戳运算（因自定义日界限需要时间戳级精度）
  */
 import { Temporal, getTemporalForCalendar } from './temporal.js';
+import { temporalCalId } from './calendar.js';
 import type { AevumEvent, CalendarId, EventStatus, Granularity, DayOverflow, LeapMonthStrategy } from '../types.js';
 
 const MIN_MS = 60_000;
 const DAY_MS = 86_400_000;
-
-/**
- * 应用层 CalendarId → Temporal 日历标识符。
- * 与 src/utils/calendar.ts 的 temporalCalId 保持一致：
- * 'juche'（主体历）底层使用 gregory，其他历法 ID 直接使用。
- */
-function temporalCalId(cal: CalendarId): string {
-  if (cal === 'juche') return 'gregory';
-  return cal;
-}
 
 /**
  * 循环事件策略选项（从全局设置传入）。

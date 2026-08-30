@@ -1,13 +1,21 @@
 /**
  * Temporal 桥接模块
  * - 支持原生 Temporal（TC39 Stage 3）的环境直接使用全局 Temporal
- * - 不支持的环境（如 Safari、Bun）自动回退到 @js-temporal/polyfill（动态导入）
+ * - 不支持的环境（如 Safari）自动回退到 temporal-polyfill（动态导入）
  * - 按日历 ID 粒度选择实现：某些浏览器原生 Temporal 禁用了特定日历
  *   （如 Firefox 139-148 禁用了 islamic / islamic-umalqura），对这些日历
  *   自动回退到 polyfill 实现。
  *
- * 性能优化：polyfill 通过动态 import() 按需加载。有原生 Temporal 的浏览器
- * （Chrome 141+、Edge 141+）完全不会下载 polyfill 代码（约 200KB+ gzip）。
+ * polyfill 选型（2026-08-30）：temporal-polyfill（fullcalendar 系）替代
+ * @js-temporal/polyfill。原因：旧 polyfill 的 chinese/dangi 闰月转换抛
+ * "Unexpected leap month suffix"、ethiopic/coptic 的 era 匹配抛错，导致 Safari
+ * （无原生 Temporal）下这些历法完全不可用；temporal-polyfill 的日历数据基于
+ * 宿主 Intl.DateTimeFormat（Safari 14.1+ 均支持），且体积更小（23KB vs 52KB
+ * gzip）、规范日期更新（2026-08 vs 2025-03）。使用其 /full/implementation
+ * 入口（强制非原生实现 + 全部日历系统）。
+ *
+ * 性能优化：polyfill 通过动态 import() 按需加载。有原生 Temporal 且所有日历
+ * 都支持的浏览器（Chrome 144+、Edge 144+、Bun 1.4+）完全不会下载 polyfill。
  * 应用启动时调用 ensureTemporalReady() 确保在渲染前就绪。
  *
  * 用法：所有需要 Temporal 的模块都从此文件导入，而非直接引用全局或 polyfill。
@@ -17,22 +25,39 @@
  * （如函数参数 `d: Temporal.PlainDate`）。
  */
 
-import type { Temporal as PolyfillTemporalType } from '@js-temporal/polyfill';
+import type { Temporal as PolyfillTemporalType } from 'temporal-polyfill/full/implementation';
 
-const _native = (globalThis as unknown as { Temporal?: typeof PolyfillTemporalType }).Temporal;
+/**
+ * Temporal 运行时值的形态（仅声明项目实际用到的静态成员）。
+ * temporal-spec 的 `Temporal` namespace 是纯类型（无值侧），故值类型手动声明。
+ */
+interface TemporalRuntime {
+  PlainDate: {
+    from(item: PolyfillTemporalType.PlainDateLike): PolyfillTemporalType.PlainDate;
+    compare(
+      a: PolyfillTemporalType.PlainDateLike,
+      b: PolyfillTemporalType.PlainDateLike
+    ): number;
+  };
+  Now: {
+    plainDateISO(timeZone?: PolyfillTemporalType.TimeZoneLike): PolyfillTemporalType.PlainDate;
+  };
+}
+
+const _native: TemporalRuntime | undefined = (globalThis as unknown as { Temporal?: TemporalRuntime }).Temporal;
 
 /**
  * polyfill 模块的动态导入 Promise（仅在需要时触发）。
  * 有原生 Temporal 且所有日历都支持的浏览器永远不会执行此导入。
  */
-let _polyfillPromise: Promise<typeof PolyfillTemporalType> | null = null;
-let _polyfillLoaded: typeof PolyfillTemporalType | null = null;
+let _polyfillPromise: Promise<TemporalRuntime> | null = null;
+let _polyfillLoaded: TemporalRuntime | null = null;
 
-function loadPolyfill(): Promise<typeof PolyfillTemporalType> {
+function loadPolyfill(): Promise<TemporalRuntime> {
   if (!_polyfillPromise) {
-    _polyfillPromise = import('@js-temporal/polyfill').then((m) => {
-      _polyfillLoaded = m.Temporal;
-      return m.Temporal;
+    _polyfillPromise = import('temporal-polyfill/full/implementation').then((m) => {
+      _polyfillLoaded = m.Temporal as TemporalRuntime;
+      return _polyfillLoaded;
     });
   }
   return _polyfillPromise;
@@ -45,7 +70,7 @@ function loadPolyfill(): Promise<typeof PolyfillTemporalType> {
 function nativeSupportsCalendar(calId: string): boolean {
   if (!_native) return false;
   try {
-    _native.PlainDate.from({ calendar: calId, year: 2026, month: 1, day: 1 });
+    _native.PlainDate.from({ calendar: calId, year: 2026, month: 1, day: 1 } as PolyfillTemporalType.PlainDateLike);
     return true;
   } catch {
     return false;
@@ -83,7 +108,7 @@ export function useNativeForCalendar(calId: string): boolean {
  * 获取指定日历对应的 Temporal 实现（原生或 polyfill）。
  * 同步版本：polyfill 必须已通过 ensureTemporalReady() 加载完成。
  */
-export function getTemporalForCalendar(calId: string): typeof PolyfillTemporalType {
+export function getTemporalForCalendar(calId: string): TemporalRuntime {
   if (useNativeForCalendar(calId) && _native) return _native;
   return _polyfillLoaded!;
 }
@@ -91,10 +116,13 @@ export function getTemporalForCalendar(calId: string): typeof PolyfillTemporalTy
 /**
  * 检测当前浏览器是否需要 polyfill。
  * 无原生 Temporal，或原生 Temporal 不支持某些日历时需要。
+ * 注意：列表须与 calendar.ts temporalCalId() 映射后的实际日历集合一致——
+ * 'islamic-rgsa' 已映射到 islamic-umalqura，无需单独探测（原生 V8/ICU 不支持
+ * rgsa 标识符，探测它会导致 Chrome/Edge 也白白加载 polyfill）。
  */
 function needsPolyfill(): boolean {
   if (!_native) return true;
-  const cals = ['gregory', 'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'islamic-rgsa', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi'];
+  const cals = ['gregory', 'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi'];
   return cals.some((c) => !nativeSupportsCalendar(c));
 }
 
@@ -111,7 +139,7 @@ export async function ensureTemporalReady(): Promise<void> {
 /**
  * 获取当前激活的 Temporal 实现（原生或已加载的 polyfill）。
  */
-function activeImpl(): typeof PolyfillTemporalType {
+function activeImpl(): TemporalRuntime {
   return _native ?? _polyfillLoaded!;
 }
 
@@ -119,8 +147,8 @@ function activeImpl(): typeof PolyfillTemporalType {
  * Temporal 运行时值——通过 Proxy 惰性转发到原生或 polyfill 实现。
  * 确保在 ensureTemporalReady() 完成后才被访问（应用 bootstrap 流程保证）。
  */
-export const Temporal: typeof PolyfillTemporalType = new Proxy(
-  {} as typeof PolyfillTemporalType,
+export const Temporal: TemporalRuntime = new Proxy(
+  {} as TemporalRuntime,
   {
     get(_target, prop: string | symbol) {
       return Reflect.get(activeImpl(), prop);

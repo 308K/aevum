@@ -1,7 +1,7 @@
 /**
  * Temporal 迁移冒烟测试 —— 用 Deno 运行（Deno 原生支持 Temporal）
  *
- * 运行：deno run --no-prompt --allow-read scripts/smoke-temporal.ts
+ * 运行：deno run --no-prompt --allow-read --allow-env --sloppy-imports scripts/smoke-temporal.ts
  *
  * 验证 Temporal 迁移后的历法转换、时间计算等核心逻辑是否正确。
  * 本脚本直接导入 src/utils/calendar.ts 和 src/utils/time-calc.ts，
@@ -11,9 +11,6 @@
  * 需映射为 'islamic-umalqura'（已在 calendar.ts 中处理）。
  */
 
-// 导入 polyfill（在 Deno 中会使用 globalThis.Temporal 如果已存在）
-// 在 Deno 中 native Temporal 已存在，polyfill 不会覆盖它
-import '@js-temporal/polyfill';
 import { ensureTemporalReady } from '../src/utils/temporal.ts';
 await ensureTemporalReady();
 
@@ -155,24 +152,27 @@ check('农历网格公历=往返公历', gridGreg ? `${gridGreg.greg.getFullYear
   backGreg ? `${backGreg.getFullYear()}-${backGreg.getMonth()}-${backGreg.getDate()}` : null);
 
 console.log('== 8. 日历表头年月格式化 ==');
+// 与 smoke.ts 第 8.5 节保持一致：非公历历法的 monthKey 统一为 Temporal monthCode（M02 / M05L…），
+// 日本和历与公历对齐用数字月，农历用汉字月名
 check('公历表头', formatYearMonthHeader('gregory', '2026', '8', 'zh-CN'), '2026年8月');
-check('伊斯兰历表头', formatYearMonthHeader('islamic-umalqura', 'islamic-umalqura|1448', '2', 'zh-CN'), '伊斯兰历1448年2月');
+check('伊斯兰历表头', formatYearMonthHeader('islamic-umalqura', 'islamic-umalqura|1448', 'M02', 'zh-CN'), '伊斯兰历1448年2月');
 check('主体历表头', formatYearMonthHeader('juche', 'juche|115', '7', 'zh-CN'), '主体115年7月');
-check('希伯来 闰年 Tishri=1月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Tishri', 'zh-CN'), '希伯来历5787年1月');
-check('希伯来 闰年 Adar I=6月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar I', 'zh-CN'), '希伯来历5787年6月');
-check('希伯来 闰年 Adar II=7月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Adar II', 'zh-CN'), '希伯来历5787年7月');
-check('希伯来 闰年 末月Elul=13月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'Elul', 'zh-CN'), '希伯来历5787年13月');
-check('希伯来 平年 Adar=6月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'Adar', 'zh-CN'), '希伯来历5786年6月');
-check('希伯来 平年 末月Elul=12月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'Elul', 'zh-CN'), '希伯来历5786年12月');
-const hbCiv = ['Tishri', 'Heshvan', 'Kislev', 'Tevet', 'Shevat', 'Adar I', 'Adar II', 'Nisan', 'Iyar', 'Sivan', 'Tamuz', 'Av', 'Elul']
+check('希伯来 闰年 Tishri=1月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M01', 'zh-CN'), '希伯来历5787年1月');
+check('希伯来 闰年 Adar I=6月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M05L', 'zh-CN'), '希伯来历5787年6月');
+check('希伯来 闰年 Adar II=7月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M06', 'zh-CN'), '希伯来历5787年7月');
+check('希伯来 闰年 末月Elul=13月', formatYearMonthHeader('hebrew', 'hebrew|5787', 'M12', 'zh-CN'), '希伯来历5787年13月');
+check('希伯来 平年 Adar=6月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'M06', 'zh-CN'), '希伯来历5786年6月');
+check('希伯来 平年 末月Elul=12月', formatYearMonthHeader('hebrew', 'hebrew|5786', 'M12', 'zh-CN'), '希伯来历5786年12月');
+const hbCiv = ['M01','M02','M03','M04','M05','M05L','M06','M07','M08','M09','M10','M11','M12']
   .map((mk) => formatYearMonthHeader('hebrew', 'hebrew|5787', mk, 'zh-CN'));
 check('希伯来 闰年民用序连续1-13', hbCiv.every((h, i) => h.endsWith(`${i + 1}月`)), true);
-check('波斯历表头', formatYearMonthHeader('persian', 'persian|1405', '5', 'zh-CN').startsWith('波斯历1405年'), true);
-check('佛教历表头', formatYearMonthHeader('buddhist', 'buddhist|2569', '8', 'zh-CN').startsWith('佛历2569年'), true);
+check('波斯历表头', formatYearMonthHeader('persian', 'persian|1405', 'M05', 'zh-CN').startsWith('波斯历1405年'), true);
+check('佛教历表头', formatYearMonthHeader('buddhist', 'buddhist|2569', 'M08', 'zh-CN').startsWith('佛历2569年'), true);
 check('日本和历表头', formatYearMonthHeader('japanese', '令和|8', '8', 'zh-CN'), '令和8年8月');
 const cnHeader = formatYearMonthHeader('chinese', '2026|丙午', '正月', 'zh-CN');
 check('农历表头含干支与月名', cnHeader.includes('丙午') && cnHeader.includes('正月'), true);
 check('英文表头含 August', formatYearMonthHeader('gregory', '2026', '8', 'en-US').includes('August'), true);
 
 console.log(`\n结果: ${pass} 通过, ${fail} 失败`);
-Deno.exit(fail ? 1 : 0);
+if (typeof Deno !== 'undefined') Deno.exit(fail ? 1 : 0);
+else process.exit(fail ? 1 : 0);
