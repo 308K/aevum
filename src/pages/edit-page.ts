@@ -547,7 +547,7 @@ export class EditPage extends LitElement {
             <div class="label">${t('fieldPreciseTime')}</div>
             <div class="hint">${t('fieldPreciseTimeHint')}</div>
           </div>
-          <md-switch ?selected=${this.hasTime} @change=${(e: Event) => (this.hasTime = this.switchSelected(e))}></md-switch>
+          <md-switch ?selected=${this.hasTime} aria-label=${t('fieldPreciseTime')} @change=${(e: Event) => (this.hasTime = this.switchSelected(e))}></md-switch>
         </div>
         ${this.hasTime
           ? html`<input
@@ -617,7 +617,7 @@ export class EditPage extends LitElement {
               }
             }}
           ></md-outlined-text-field>
-          <button type="button" class="add-tag-btn" @click=${this.createTag} aria-label=${t('actionAdd')}>
+          <button type="button" class="add-tag-btn" @click=${this.createTag} aria-label=${t('actionAddTag')}>
             ${icon('add', 22)}
           </button>
         </div>
@@ -651,7 +651,7 @@ export class EditPage extends LitElement {
 
         <div class="switch-row">
           <div class="label">${t('fieldPinned')}</div>
-          <md-switch ?selected=${this.pinned} @change=${(e: Event) => (this.pinned = this.switchSelected(e))}></md-switch>
+          <md-switch ?selected=${this.pinned} aria-label=${t('fieldPinned')} @change=${(e: Event) => (this.pinned = this.switchSelected(e))}></md-switch>
         </div>
 
         <div class="actions">

@@ -21,7 +21,12 @@ export const enUS: LocaleDict = {
   actionBack: 'Back',
 
   emptyTitle: 'No days recorded yet',
-  emptyHint: 'Tap the button below to record your first important day',
+  emptyHint: 'Use the "Add event" button to record your first important day',
+
+  // Screen reader descriptions
+  ariaCardSummary: '{name}, target date {date}, {days} days {status}',
+  ariaCardToday: '{name}, target date {date}, today',
+  actionAddTag: 'Add tag',
 
   fieldName: 'Event name',
   fieldNamePlaceholder: 'e.g. College Entrance Exam, Anniversary',
@@ -139,6 +144,15 @@ export const enUS: LocaleDict = {
   themeLight: 'Light',
   themeDark: 'Dark',
   settingsSeedColor: 'Theme color',
+  // Readable names for preset seed colors (for screen readers)
+  colorViolet: 'Violet',
+  colorTeal: 'Teal',
+  colorRose: 'Rose',
+  colorOlive: 'Olive',
+  colorIndigo: 'Indigo',
+  colorRust: 'Rust',
+  colorHeather: 'Heather',
+  colorMauve: 'Mauve',
   settingsGradientBg: 'Gradient background',
   settingsGradientBgHint: 'Interpolated in OKLCH color space for smoother transitions',
   experimental: 'Experimental',

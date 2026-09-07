@@ -5,10 +5,11 @@ import { LitElement, html, css } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import type { AevumEvent, Recurrence } from '../types.js';
 import { formatEventDate, weekdaySuffix } from '../utils/calendar.js';
-import { effectiveEvent, parseBoundary } from '../utils/time-calc.js';
+import { effectiveEvent, parseBoundary, computeDiff } from '../utils/time-calc.js';
+import { statusLabel } from '../utils/format.js';
 import { getSettings } from '../store/settings.js';
 import { resolveEventTags, tagDisplay } from '../store/tags.js';
-import { getLocale, onLocaleChange, t } from '../i18n.js';
+import { getLocale, onLocaleChange, t, formatNumber } from '../i18n.js';
 import { icon } from '../icons.js';
 import './time-display.js';
 
@@ -178,6 +179,26 @@ export class EventCard extends LitElement {
     return `--tag-bg: color-mix(in oklch, ${color} 22%, var(--md-sys-color-surface-container)); --tag-fg: color-mix(in oklch, ${color} 72%, var(--md-sys-color-on-surface));`;
   }
 
+  /**
+   * 合成完整的可访问名称：名称 + 目标日期 + 状态与天数。
+   * role="button" 上的 aria-label 会屏蔽全部子节点内容，
+   * 必须拼装完整描述，否则读屏用户无法获知倒数天数（WCAG 4.1.2）。
+   */
+  private accessibleName(dateLine: string): string {
+    const s = getSettings();
+    const eff = effectiveEvent(this.event, Date.now(), parseBoundary(s.dayBoundary), {
+      dayOverflow: s.dayOverflow,
+      leapMonthStrategy: s.leapMonthStrategy,
+    });
+    // 天数摘要固定用「仅天数」粒度，跨粒度设置保持一致的读屏体验
+    const diff = computeDiff(eff, Date.now(), parseBoundary(s.dayBoundary), 'day');
+    const days = formatNumber(diff.segments[0]?.value ?? 0);
+    if (diff.status === 'today') {
+      return t('ariaCardToday', { name: this.event.name, date: dateLine });
+    }
+    return t('ariaCardSummary', { name: this.event.name, date: dateLine, status: statusLabel(diff), days });
+  }
+
   render() {
     const s = getSettings();
     const ev = effectiveEvent(this.event, Date.now(), parseBoundary(s.dayBoundary), {
@@ -197,7 +218,7 @@ export class EventCard extends LitElement {
         class="card"
         role="button"
         tabindex="0"
-        aria-label=${ev.name}
+        aria-label=${this.accessibleName(dateLine)}
         @click=${this.onActivate}
         @keydown=${this.onActivate}
       >

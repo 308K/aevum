@@ -22,7 +22,12 @@ export const zhCN = {
 
   // 空状态
   emptyTitle: '还没有记录任何日子',
-  emptyHint: '点击右下角按钮，记录你的第一个重要日子',
+  emptyHint: '点击「添加事件」按钮，记录你的第一个重要日子',
+
+  // 读屏描述
+  ariaCardSummary: '{name}，目标日期{date}，{status}{days}天',
+  ariaCardToday: '{name}，目标日期{date}，就是今天',
+  actionAddTag: '添加标签',
 
   // 表单
   fieldName: '事件名称',
@@ -148,6 +153,15 @@ export const zhCN = {
   themeLight: '亮色',
   themeDark: '暗色',
   settingsSeedColor: '主题色',
+  // 预设主题色可读名称（读屏用）
+  colorViolet: '紫罗兰',
+  colorTeal: '青碧',
+  colorRose: '玫瑰红',
+  colorOlive: '橄榄绿',
+  colorIndigo: '靛蓝',
+  colorRust: '赭橙',
+  colorHeather: '黛紫',
+  colorMauve: '灰粉',
   settingsGradientBg: '渐变背景',
   settingsGradientBgHint: '使用OKLCH色彩空间插值，过渡更平滑自然',
   experimental: '实验性功能',

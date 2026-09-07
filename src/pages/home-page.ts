@@ -149,11 +149,16 @@ export class HomePage extends LitElement {
     return html`
       ${hasTags
         ? html`<div class="filterbar">
-            <button class="fchip ${filtering ? '' : 'on'}" @click=${this.clearFilter}>${t('filterAll')}</button>
+            <button
+              class="fchip ${filtering ? '' : 'on'}"
+              aria-pressed=${filtering ? 'false' : 'true'}
+              @click=${this.clearFilter}
+            >${t('filterAll')}</button>
             ${getTags().map(
               (tg) => html`<button
                 class="fchip ${activeFilter === tg.id ? 'on' : ''}"
                 style="--chip-color: ${tg.color}"
+                aria-pressed=${activeFilter === tg.id ? 'true' : 'false'}
                 @click=${() => this.toggleFilter(tg.id)}
               >${tagDisplay(tg)}</button>`
             )}

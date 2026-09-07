@@ -974,6 +974,9 @@ export class DateCalendar extends LitElement {
           </button>
         </div>
 
+        <!-- 键盘操作提示：置于网格之前，读屏先念提示再念日历 -->
+        <p class="hint" id=${HINT_ID}>${t('calKeyboardHint')}</p>
+
         <div class="grid" id=${GRID_ID} role="grid" aria-label=${`${yearDisplay} ${monthDisplay}`} aria-describedby=${HINT_ID} @keydown=${this.onGridKeydown}>
           <div class="weekdays" role="row">
             ${headers.map(
@@ -991,8 +994,6 @@ export class DateCalendar extends LitElement {
             </div>`
           )}
         </div>
-
-        <p class="hint" id=${HINT_ID}>${t('calKeyboardHint')}</p>
 
         <div class="footer">
           <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>

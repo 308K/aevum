@@ -155,14 +155,16 @@ export class EventDetail extends LitElement {
       display: inline-flex;
       align-items: center;
     }
-    /* 头部标题 + 右上角关闭叉号 */
+    /* 头部标题 + 右上角关闭叉号（置于 content 槽内，避免关闭按钮混入弹窗可访问名称） */
     .dialog-head {
       display: flex;
       align-items: center;
       justify-content: space-between;
       gap: 8px;
+      margin-bottom: 4px;
     }
     .dialog-title {
+      margin: 0;
       font-size: 1.35rem;
       font-weight: 500;
       color: var(--md-sys-color-on-surface);
@@ -170,6 +172,8 @@ export class EventDetail extends LitElement {
       text-overflow: ellipsis;
       white-space: nowrap;
       min-width: 0;
+      /* 程序化聚焦（autofocus）不显示焦点环 */
+      outline: none;
     }
     .head-close {
       flex: none;
@@ -189,8 +193,13 @@ export class EventDetail extends LitElement {
 
   @state() private eventId: string | null = null;
 
+  /** 打开弹窗时的触发元素，关闭后恢复焦点（WCAG 2.4.3） */
+  private restoreFocusTo: HTMLElement | null = null;
+
   open(id: string) {
     this.eventId = id;
+    const active = document.activeElement;
+    this.restoreFocusTo = active instanceof HTMLElement ? active : null;
     this.detailDialog.show();
   }
 
@@ -200,6 +209,12 @@ export class EventDetail extends LitElement {
 
   private close() {
     this.detailDialog.close();
+  }
+
+  /** 弹窗关闭动画结束后（含 Esc / 遮罩点击）把焦点还给触发卡片 */
+  private onDialogClosed() {
+    this.restoreFocusTo?.focus();
+    this.restoreFocusTo = null;
   }
 
   private onEdit() {
@@ -247,14 +262,14 @@ export class EventDetail extends LitElement {
           .join(' ')
       : '';
     return html`
-      <md-dialog id="detailDialog">
-        <div slot="headline" class="dialog-head">
-          <span class="dialog-title">${ev ? ev.name : ''}</span>
-          <md-icon-button class="head-close" @click=${this.close} aria-label=${t('actionClose')}>
-            ${icon('close', 20)}
-          </md-icon-button>
-        </div>
+      <md-dialog id="detailDialog" aria-label=${ev ? ev.name : ''} @closed=${this.onDialogClosed}>
         <div slot="content">
+          <div class="dialog-head">
+            <h2 class="dialog-title" tabindex="-1" autofocus>${ev ? ev.name : ''}</h2>
+            <md-icon-button class="head-close" @click=${this.close} aria-label=${t('actionClose')}>
+              ${icon('close', 20)}
+            </md-icon-button>
+          </div>
           ${ev && eff
             ? html`
                 <div class="hero ${ev.bgImage ? 'has-bg' : ''}">

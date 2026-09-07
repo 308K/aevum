@@ -65,6 +65,16 @@ export class AevumApp extends LitElement {
     }
     .topbar md-icon-button {
       color: var(--md-sys-color-on-surface-variant);
+      border-radius: 50%;
+    }
+    /* 键盘聚焦时显示高对比度聚焦环（焦点落在组件内部 button 上，需 :has 匹配） */
+    .topbar md-icon-button:has(:focus-visible) {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+    }
+    .fab md-fab:has(:focus-visible) {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 3px;
     }
     .install-banner {
       display: flex;

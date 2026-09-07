@@ -100,6 +100,18 @@ const LEAP_MONTH_DESC_KEYS: Record<LeapMonthStrategy, 'leapMonthNonLeapDesc' | '
   both: 'leapMonthBothDesc',
 };
 
+/** 预设主题色 → 可读颜色名（读屏用，避免朗读十六进制字符） */
+const SEED_COLOR_NAMES: Record<string, 'colorViolet' | 'colorTeal' | 'colorRose' | 'colorOlive' | 'colorIndigo' | 'colorRust' | 'colorHeather' | 'colorMauve'> = {
+  '#6750A4': 'colorViolet',
+  '#006A6A': 'colorTeal',
+  '#8E4956': 'colorRose',
+  '#4C662B': 'colorOlive',
+  '#3B608F': 'colorIndigo',
+  '#9A4522': 'colorRust',
+  '#5B5791': 'colorHeather',
+  '#7D5260': 'colorMauve',
+};
+
 @customElement('settings-page')
 export class SettingsPage extends LitElement {
   static styles = css`
@@ -111,6 +123,7 @@ export class SettingsPage extends LitElement {
       margin-bottom: 8px;
     }
     .group-title {
+      margin: 0;
       font-size: 0.8rem;
       font-weight: 600;
       letter-spacing: 0.04em;
@@ -454,7 +467,7 @@ export class SettingsPage extends LitElement {
     const s = this.settings;
     return html`
       <div class="group">
-        <div class="group-title">${t('settingsSectionGeneral')}</div>
+        <h2 class="group-title">${t('settingsSectionGeneral')}</h2>
         <div class="card">
           <div class="item">
             <div class="label">${t('settingsLanguage')}</div>
@@ -490,7 +503,7 @@ export class SettingsPage extends LitElement {
       </div>
 
       <div class="group">
-        <div class="group-title">${t('settingsSectionAppearance')}</div>
+        <h2 class="group-title">${t('settingsSectionAppearance')}</h2>
         <div class="card">
           <div class="item">
             <div class="label">${t('settingsThemeMode')}</div>
@@ -513,7 +526,7 @@ export class SettingsPage extends LitElement {
                   class="swatch"
                   style="--swatch-color: ${color}"
                   ?selected=${s.seedColor.toLowerCase() === color.toLowerCase() && !s.customThemes.some((c) => c.color.toLowerCase() === color.toLowerCase())}
-                  aria-label=${color}
+                  aria-label=${SEED_COLOR_NAMES[color.toUpperCase()] ? t(SEED_COLOR_NAMES[color.toUpperCase()]) : color}
                   @click=${() => this.set('seedColor', color)}
                 ></button>`
               )}
@@ -534,6 +547,7 @@ export class SettingsPage extends LitElement {
             </div>
             <md-switch
               ?selected=${s.gradientBg}
+              aria-label=${t('settingsGradientBg')}
               @change=${(e: Event) => this.set('gradientBg', (e.target as MdSwitch).selected)}
             ></md-switch>
           </div>
@@ -541,7 +555,7 @@ export class SettingsPage extends LitElement {
       </div>
 
       <div class="group">
-        <div class="group-title">${t('settingsSectionCustomThemes')}</div>
+        <h2 class="group-title">${t('settingsSectionCustomThemes')}</h2>
         <div class="card">
           ${s.customThemes.length === 0
             ? html`<div class="theme-empty">${t('customThemeEmptyHint')}</div>`
@@ -612,7 +626,7 @@ export class SettingsPage extends LitElement {
       </div>
 
       <div class="group">
-        <div class="group-title">${t('settingsSectionTime')}</div>
+        <h2 class="group-title">${t('settingsSectionTime')}</h2>
         <div class="card">
           <div class="item">
             <div>
@@ -697,7 +711,7 @@ export class SettingsPage extends LitElement {
       </div>
 
       <div class="group">
-        <div class="group-title">${t('settingsRecurrenceStrategy')}</div>
+        <h2 class="group-title">${t('settingsRecurrenceStrategy')}</h2>
         <div class="card">
           <div class="item">
             <div>
@@ -749,7 +763,7 @@ export class SettingsPage extends LitElement {
       </div>
 
       <div class="group">
-        <div class="group-title">${t('settingsSectionTags')}</div>
+        <h2 class="group-title">${t('settingsSectionTags')}</h2>
         <div class="card">
           ${this.tagList.map(
             (tg) => html`
@@ -795,7 +809,7 @@ export class SettingsPage extends LitElement {
       </div>
 
       <div class="group">
-        <div class="group-title">${t('settingsSectionData')}</div>
+        <h2 class="group-title">${t('settingsSectionData')}</h2>
         <div class="card">
           <div class="item item-data">
             <div>
