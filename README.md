@@ -22,7 +22,7 @@
 
 - **倒数日**：记录重要日期，自动计算距离今天的天数（未来倒数 / 过去已历 / 今日）。
 - **循环事件**：支持不循环 / 每周 / 每月 / 每年，自动推算下一次发生日；可配置日不存在时的溢出策略（RFC 5545 跳过 / 月末收敛 / 次月顺延）与闰月策略（从正不从闰 / 严格闰月 / 平闰皆可）。
-- **多历法**：基于 TC39 Temporal API + `Intl`，支持公历、农历、伊斯兰历（乌姆库拉/民用/天文表算/沙特观月）、希伯来历、波斯历、佛历、日本和历、民国纪年、印度国家历、埃塞俄比亚历、科普特历、韩国农历、主体历共 17 种，无需重型日期库。
+- **多历法**：基于 TC39 Temporal API + `Intl`，支持公历、农历、伊斯兰历（乌姆库拉/民用/天文表算）、希伯来历、波斯历、佛历、日本和历、民国纪年、印度国家历、埃塞俄比亚历、科普特历、韩国农历、主体历共 16 种，无需重型日期库。
 - **多粒度时间展示**：天 / 天-时-分-秒 / 年月日 / 年周天 / 周天 多种呈现。
 - **精确时间**：可设置目标时刻（HH:MM），配合「天-时-分-秒」粒度精确到秒。
 - **自定义日界限**：设置一天从何时开始（如 `04:00`），影响"今天"的判定。
@@ -55,7 +55,7 @@
 | 日期/历法 | [TC39 Temporal API](https://tc39.es/proposal-temporal/) | 原生优先，按需回退 `temporal-polyfill` |
 | 构建 | [Vite 5](https://vitejs.dev/) + [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) | 路由级代码分割 + Service Worker |
 | 语言 | [TypeScript](https://www.typescriptlang.org/) | 严格类型，`tsc --noEmit` 检查 |
-| 测试 | [Vitest](https://vitest.dev/) | 351 条断言，CI 集成 |
+| 测试 | [Vitest](https://vitest.dev/) | 345 条断言，CI 集成 |
 | 包管理 | [Bun](https://bun.sh/) | 依赖安装与脚本运行 |
 
 ### 性能优化
@@ -78,7 +78,7 @@ bun run preview    # 本地预览构建产物
 
 ## 测试
 
-项目使用 [Vitest](https://vitest.dev/) 作为自动化测试框架，351 条断言覆盖历法转换、时间计算、循环事件、主题管理、备份导入等核心逻辑：
+项目使用 [Vitest](https://vitest.dev/) 作为自动化测试框架，345 条断言覆盖历法转换、时间计算、循环事件、主题管理、备份导入等核心逻辑：
 
 ```bash
 bun run test          # 单次运行全部测试
@@ -88,7 +88,7 @@ bun run test:coverage # 带覆盖率报告
 
 GitHub Actions CI 在每次 push / PR 时自动运行 `typecheck` + `test`（[CI 状态](https://github.com/308K/aevum/actions/workflows/ci.yml)）。
 
-此外保留了一组 Deno 交叉验证脚本，用 Deno 原生 Temporal 验证与 Bun（polyfill）路径的一致性：
+此外保留一个冒烟脚本，用于用 Deno 原生 Temporal 验证与 Bun（polyfill）路径的一致性：
 
 ```bash
 deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts
@@ -125,11 +125,11 @@ aevum/
 │   ├── icons/                  # PWA 图标（SVG）
 │   └── robots.txt
 ├── scripts/                    # Deno 交叉验证脚本
-│   ├── smoke-temporal.ts       # Deno 原生 Temporal 兼容性
-│   └── ...
-├── tests/                      # Vitest 自动化测试（351 条断言）
+│   └── smoke-temporal.ts       # Deno 原生 Temporal 兼容性
+├── tests/                      # Vitest 自动化测试（345 条断言）
 │   ├── setup.ts                # 测试环境垫片（localStorage / navigator / i18n）
 │   ├── calendar.test.ts        # 历法转换 / 纪元 / 差值 / 循环 / 网格 / 表头
+│   ├── calendar-registry.test.ts # 历法注册表守护（清退迁移 / 无死项）
 │   ├── themes.test.ts          # 主题色增删改去重
 │   ├── backup.test.ts          # 备份导入清洗
 │   ├── dst.test.ts             # DST 回归（16 种非公历经法）

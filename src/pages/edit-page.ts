@@ -34,7 +34,6 @@ const CAL_I18N_KEYS: Record<CalendarId, string> = {
   'islamic-umalqura': 'calIslamicUmalqura',
   'islamic-civil': 'calIslamicCivil',
   'islamic-tbla': 'calIslamicTbla',
-  'islamic-rgsa': 'calIslamicRgsa',
   hebrew: 'calHebrew',
   persian: 'calPersian',
   buddhist: 'calBuddhist',
@@ -281,7 +280,9 @@ export class EditPage extends LitElement {
       if (ev) {
         this.editId = id;
         this.name = ev.name;
-        this.calendar = ev.calendar;
+        // 已移除的历法（如旧数据的 islamic-rgsa）回退为默认历法，
+        // 否则 select 无匹配项会显示为空
+        this.calendar = CALENDAR_IDS.includes(ev.calendar) ? ev.calendar : getSettings().defaultCalendar;
         const [y, m, d] = ev.date.split('-').map(Number);
         this.gregDate = new Date(y, m - 1, d);
         this.hasTime = Boolean(ev.time);

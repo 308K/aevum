@@ -7,7 +7,6 @@ export type CalendarId =
   | 'islamic-umalqura'
   | 'islamic-civil'
   | 'islamic-tbla'
-  | 'islamic-rgsa'
   | 'hebrew'
   | 'persian'
   | 'buddhist'
@@ -23,6 +22,10 @@ export type CalendarId =
 /** 旧版 CalendarId → 当前 CalendarId 的迁移映射（用于 localStorage 旧数据兼容） */
 const DEPRECATED_CAL: Record<string, CalendarId> = {
   islamic: 'islamic-umalqura',
+  // 'islamic-rgsa'（沙特观月）在原生 Temporal 中不被支持（RangeError），
+  // polyfill 亦无其数据，事实上不可用，故不再对外提供并迁移至 umalqura。
+  // CLDR 中 rgsa 与 umalqura 共用同一份 Umm al-Qura 数据，语义等价。
+  'islamic-rgsa': 'islamic-umalqura',
 };
 
 /** 将旧版 CalendarId 迁移为当前 CalendarId（无变化则原样返回） */

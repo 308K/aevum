@@ -28,7 +28,6 @@ const CAL_I18N_KEYS: Record<string, string> = {
   'islamic-umalqura': 'calIslamicUmalqura',
   'islamic-civil': 'calIslamicCivil',
   'islamic-tbla': 'calIslamicTbla',
-  'islamic-rgsa': 'calIslamicRgsa',
   hebrew: 'calHebrew',
   persian: 'calPersian',
   buddhist: 'calBuddhist',

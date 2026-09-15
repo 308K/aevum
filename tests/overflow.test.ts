@@ -44,7 +44,6 @@ const CALS: { id: CalendarId; anchorIso: string; label: string }[] = [
   { id: 'islamic-umalqura', anchorIso: '2025-07-31', label: '伊斯兰历(乌姆库拉)' },
   { id: 'islamic-civil', anchorIso: '2025-07-31', label: '伊斯兰历(民用)' },
   { id: 'islamic-tbla', anchorIso: '2025-07-31', label: '伊斯兰历(天文表算)' },
-  { id: 'islamic-rgsa', anchorIso: '2025-07-31', label: '伊斯兰历(沙特观月)' },
   { id: 'hebrew', anchorIso: '2025-09-23', label: '希伯来历' },
   { id: 'persian', anchorIso: '2025-03-21', label: '波斯历' },
   { id: 'buddhist', anchorIso: '2025-01-01', label: '佛教历' },

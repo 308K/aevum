@@ -116,9 +116,8 @@ export function getTemporalForCalendar(calId: string): TemporalRuntime {
 /**
  * 检测当前浏览器是否需要 polyfill。
  * 无原生 Temporal，或原生 Temporal 不支持某些日历时需要。
- * 注意：列表须与 calendar.ts temporalCalId() 映射后的实际日历集合一致——
- * 'islamic-rgsa' 已映射到 islamic-umalqura，无需单独探测（原生 V8/ICU 不支持
- * rgsa 标识符，探测它会导致 Chrome/Edge 也白白加载 polyfill）。
+ * 注意：列表须与 calendar.ts temporalCalId() 映射后的实际日历集合一致
+ * （探测未映射的标识符会导致引擎白白加载 polyfill）。
  */
 function needsPolyfill(): boolean {
   if (!_native) return true;

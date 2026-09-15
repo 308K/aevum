@@ -17,7 +17,6 @@ export const CALENDAR_IDS: CalendarId[] = [
   'islamic-umalqura',
   'islamic-civil',
   'islamic-tbla',
-  'islamic-rgsa',
   'hebrew',
   'persian',
   'buddhist',
@@ -46,10 +45,6 @@ export interface CalOption {
  * 将应用层 CalendarId 映射为 Temporal 支持的日历标识符。
  * - 'juche'（主体历）在 Temporal/Intl 中不存在，底层使用 gregory 做日期运算，
  *   年份偏移在应用层处理（jucheYear = gregYear - 1911）
- * - 'islamic-rgsa'（沙特观月）在主流原生 Temporal（V8/ICU：Chrome/Edge/Bun/Deno）
- *   中不被支持（RangeError），且 @js-temporal/polyfill 对其静默透传（返回公历
- *   原值，数据全错）。CLDR 中 rgsa 与 umalqura 使用同一份 Umm al-Qura 数据，
- *   语义等价，故底层运算统一映射到 islamic-umalqura（存储键/显示名仍为 rgsa）。
  *
  * 注意：某些浏览器（如 Firefox 139-148）原生 Temporal 不支持 islamic-umalqura，
  * 这由 getTemporalForCalendar() 在 temporal.ts 中处理——按日历 ID 粒度选择
@@ -57,7 +52,6 @@ export interface CalOption {
  */
 export function temporalCalId(cal: CalendarId): string {
   if (cal === 'juche') return 'gregory';
-  if (cal === 'islamic-rgsa') return 'islamic-umalqura';
   return cal;
 }
 
@@ -78,7 +72,6 @@ const ERA_KEYS: Partial<Record<CalendarId, keyof LocaleDict>> = {
   'islamic-umalqura': 'eraIslamicUmalqura',
   'islamic-civil': 'eraIslamicCivil',
   'islamic-tbla': 'eraIslamicTbla',
-  'islamic-rgsa': 'eraIslamicRgsa',
   hebrew: 'eraHebrew',
   persian: 'eraPersian',
   buddhist: 'eraBuddhist',
@@ -110,12 +103,9 @@ const fmtCache = new Map<string, Intl.DateTimeFormat>();
 /**
  * Intl 日历标签映射。
  * - 'juche' 底层使用 gregory，Intl 标签为 gregory
- * - 'islamic-rgsa' 底层运算已映射到 umalqura（见 temporalCalId），
- *   展示层同样映射，保证显示与内部计算数据一致
  */
 function intlCalTag(cal: CalendarId): string {
   if (cal === 'juche') return 'gregory';
-  if (cal === 'islamic-rgsa') return 'islamic-umalqura';
   return cal;
 }
 
@@ -273,8 +263,7 @@ function keyPartsFromTemporal(
   const date = new Date(greg.year, greg.month - 1, greg.day);
   const kp = partsOf(fmt('en-US', cal, { year: 'numeric', month: 'numeric', day: 'numeric', era: 'short' }), date);
   const dp = partsOf(fmt(displayLocale, cal, { year: 'numeric', month: 'long', day: 'numeric', era: 'short' }), date);
-  // 统一用 Temporal 的 year 做键：dangi 的 Intl 无 year 字段（用 relatedYear），
-  // islamic-rgsa 的 Intl year 可能与 Temporal year 不一致。
+  // 统一用 Temporal 的 year 做键：dangi 的 Intl 无 year 字段（用 relatedYear）。
   // ethiopic 的 Temporal year 是 Amete Alem 纪年（如 7517），但 yearKey 需存储
   // eraYear（Amete Mihret 纪年，如 2017），否则 resolveYearStart 无法正确构造。
   const yearStr = cal === 'ethiopic'
@@ -284,7 +273,8 @@ function keyPartsFromTemporal(
   const yearKey = `${cal}|${yearStr}`;
   const yearDisplay = eraStr ? `${eraStr} ${yearStr}` : yearStr;
   // monthKey 统一使用 monthCode（如 M07、M06L），而非 Intl numeric month。
-  // 原因：islamic-rgsa 的 Intl 月份编号在同一 Temporal 历法月内可能因日期不同而变化
+  // 原因：含观月成分的历法（islamic-civil / islamic-tbla / umalqura）的 Intl 月份编号
+  // 在同一 Temporal 历法月内可能因日期不同而变化
   // （新月发生在公历月中旬时，月中的 Intl 月份可能与月首不同），
   // 导致 keysFromGregorian（针对具体日期）与 monthOptions（针对月首）生成不同 monthKey。
   // monthCode 在同一 Temporal 历法月内是稳定的，且可逆。

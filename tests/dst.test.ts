@@ -12,7 +12,7 @@ beforeAll(async () => {
 });
 
 const NON_GREG: CalendarId[] = [
-  'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'islamic-rgsa',
+  'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla',
   'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian',
   'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi', 'juche',
 ];

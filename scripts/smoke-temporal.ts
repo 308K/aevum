@@ -58,7 +58,6 @@ check('juche 中文纪元', formatEventDate('2026-07-31', 'juche', 'zh-CN'), '�
 check('islamic-umalqura 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-umalqura').yearKey, 'islamic-umalqura|1448');
 check('islamic-civil 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-civil').yearKey.startsWith('islamic-civil|'), true);
 check('islamic-tbla 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-tbla').yearKey.startsWith('islamic-tbla|'), true);
-check('islamic-rgsa 年份键', keysFromGregorian(new Date(2026, 6, 31), 'islamic-rgsa').yearKey.startsWith('islamic-rgsa|'), true);
 check('roc 年份键', keysFromGregorian(new Date(2026, 6, 31), 'roc').yearKey.startsWith('roc|'), true);
 check('indian 年份键', keysFromGregorian(new Date(2026, 6, 31), 'indian').yearKey.startsWith('indian|'), true);
 check('ethiopic 年份键', keysFromGregorian(new Date(2026, 6, 31), 'ethiopic').yearKey.startsWith('ethiopic|'), true);
@@ -70,7 +69,7 @@ check('hebrew 闰年闰亚达月', formatEventDate('2027-02-10', 'hebrew', 'zh-C
 check('hebrew 闰年亚达月', formatEventDate('2027-03-10', 'hebrew', 'zh-CN'), '希伯来历5787年7月1日');
 
 console.log('== 2. 历法键 ↔ 公历 往返 ==');
-const cals: CalendarId[] = ['gregory', 'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'islamic-rgsa', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi', 'juche'];
+const cals: CalendarId[] = ['gregory', 'chinese', 'islamic-umalqura', 'islamic-civil', 'islamic-tbla', 'hebrew', 'persian', 'buddhist', 'japanese', 'roc', 'indian', 'ethiopic', 'ethiopic-amete-alem', 'coptic', 'dangi', 'juche'];
 for (const cal of cals) {
   const src = new Date(2026, 6, 31); // 2026-07-31
   const keys = keysFromGregorian(src, cal);

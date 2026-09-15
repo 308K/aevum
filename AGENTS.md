@@ -41,25 +41,20 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
   `Remove-Item -LiteralPath 'D:\dev\aevum\dist' -Recurse -Force`（PowerShell），随后 `bun run build`。（`bash` 的 `rm` 也会被拦截且 fail-closed，勿用。）
 - **会话恢复回退**：IDE 会话恢复偶发把文件回退到最近一次编辑态；关键修复后请用 grep 特征串核对 `dist/` 产物是否真正包含改动，避免「改了但没构建进去」。
 - **本地化 `<select>` 年份键**：历法年份键形如 `chinese|2026`，locale 无关、不受 era bug 影响，跨历法比较/排序请直接用它而非格式化后的字符串。
-- **Temporal 历法标识符映射**：`islamic` 在 Temporal 中不存在，`src/utils/calendar.ts` 的 `temporalCalId()` 会将其映射为 `islamic-umalqura`（与 Intl 的 `islamic` 结果一致）。
+- **Temporal 历法标识符映射**：`islamic` 与 `islamic-rgsa` 在 Temporal 中不存在（rgsa 在原生 V8/ICU 抛 RangeError，polyfill 无数据），`src/types.ts` 的 `DEPRECATED_CAL` 会将其迁移为 `islamic-umalqura`；`temporalCalId()` 另将 `juche` 映射为 `gregory`。**不对外提供的历法（如 `islamic-rgsa`）不得留在 `CALENDAR_IDS`**，否则 UI `<select>` 会显示一个选不中的死项；同时需保证从 localStorage / 备份读入的旧值经 `migrateCalendarId()` + `CALENDAR_IDS` 白名单双重兜底。
 - **Temporal era 与 Intl era 不一致**：Temporal 返回英文小写 era（如 `"reiwa"`），Intl 返回本地化 era（如 `"令和"`）。`resolveYearStart()` 在搜索日本和历年份时使用 Intl 匹配 era，而非 Temporal 的 era 属性。
 
 ## Testing instructions
-无测试框架 / 无 CI / 无 linter 强制门禁；回归靠冒烟脚本（纯逻辑、无 DOM）：
-- `bun scripts/smoke.ts` —— 核心逻辑：历法键↔公历往返、农历/干支/各非公历纪元本地化、日界限、多粒度、枚举（约 68 条断言）。使用 `@js-temporal/polyfill`（bun 无原生 Temporal）。
-- `deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts` —— Temporal 专项测试：与 smoke.ts 相同的断言，但使用 Deno 原生 Temporal（验证原生兼容性）。
-- `bun scripts/smoke-themes.ts` —— 自定义主题色逻辑：增 / 删 / 改 / 同色去重 / 删当前色回退默认。
-- `bun scripts/smoke-dst.ts` —— DST 日进位回归。
-- `bun scripts/smoke-backup.ts` —— 备份导入清洗。
-- `bun scripts/smoke-recur.ts` —— 循环事件回归（日本和历改元边界：昭和 12 月起始 / 平成正月起始 / 令和年中起始，monthly/yearly/weekly/精确时间，约 18 条断言）。也可用 Deno 原生 Temporal 跑（`deno run --no-prompt --allow-read --allow-env scripts/smoke-recur.ts`）。
-修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑对应脚本。
+回归主门禁是 Vitest（见下节）；smoke 脚本已收敛为仅保留一个不可替代的：
+- `deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts` —— Temporal 交叉验证：与 Vitest 覆盖相同的断言，但使用 Deno 原生 Temporal 跑（验证 Bun polyfill 路径与原生实现一致）。曾与其重复的其余 smoke 脚本已删除，覆盖已并入对应 `tests/*.test.ts`。
+修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑 `bun run test`；涉及 Temporal 语义的改动另跑 Deno 交叉验证。
 
 ## Vitest 测试
 项目已引入 **Vitest** 作为自动化测试框架，测试文件位于 `tests/` 目录：
-- `bun run test` —— 单次运行全部测试（351 条断言，约 1.3s）
+- `bun run test` —— 单次运行全部测试（345 条断言 + 2 skipped，约 1.4s）
 - `bun run test:watch` —— watch 模式
 - `bun run test:coverage` —— 带覆盖率报告
 - `tests/setup.ts` —— 注入 localStorage / navigator 垫片（node 环境无全局 localStorage）
 - Store 模块（`events.ts` / `settings.ts` / `tags.ts`）导出 `__resetForTesting()` 用于 `beforeEach` 重置内存缓存
-- 原 `scripts/smoke-*.ts` 保留不动，其中 `smoke-temporal.ts` 仍需用 Deno 原生 Temporal 跑交叉验证
+- `tests/calendar-registry.test.ts` —— 历法注册表守护：`islamic-rgsa` 清退迁移、`CALENDAR_IDS` 长度/无重复/无死项
 - **GitHub Actions CI**（`.github/workflows/ci.yml`）：push/PR 时自动运行 `bun install --frozen-lockfile` → `bun run typecheck` → `bun run test`

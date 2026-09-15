@@ -18,6 +18,7 @@ import '@material/web/iconbutton/icon-button.js';
 import type { MdSwitch } from '@material/web/switch/switch.js';
 import type { MdOutlinedSelect } from '@material/web/select/outlined-select.js';
 import type { MdDialog } from '@material/web/dialog/dialog.js';
+import { DEFAULT_SETTINGS } from '../types.js';
 import type {
   AevumSettings,
   CalendarId,
@@ -353,6 +354,11 @@ export class SettingsPage extends LitElement {
   }
 
   private set<K extends keyof AevumSettings>(key: K, value: AevumSettings[K]) {
+    // 已移除的历法（如旧数据的 islamic-rgsa）回退为默认历法，
+    // 否则 select 无匹配项会显示为空
+    if (key === 'defaultCalendar' && !CALENDAR_IDS.includes(value as CalendarId)) {
+      value = DEFAULT_SETTINGS.defaultCalendar as AevumSettings[K];
+    }
     updateSettings({ [key]: value });
   }
 
