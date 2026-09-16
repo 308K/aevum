@@ -173,6 +173,40 @@ export class AevumApp extends LitElement {
   private unsubLocale?: () => void;
   private unsubInstall?: () => void;
 
+  /**
+   * 应用级 Esc 分级返回（捕获阶段，优先级从高到低）：
+   * 1. 事件已被组件处理（md-select 菜单/md-dialog/color-picker 等会 preventDefault）→ 放行
+   * 2. 任意 md-dialog 打开中 → 放行（原生 <dialog> 自带 Esc cancel 流程）
+   * 3. 焦点在文本输入类元素 → 仅失焦，不改路由（避免误退页面丢表单）
+   * 4. 非主页路由 → 返回主页
+   */
+  private onGlobalKeydown = (e: KeyboardEvent) => {
+    if (e.key !== 'Escape') return;
+    if (e.defaultPrevented) return;
+    // md-dialog 打开中（含 shadow DOM 内）交给其自身的 cancel 流程
+    if (this.shadowRoot?.querySelector('md-dialog[open]')) return;
+    const target = e.target as HTMLElement | null;
+    const composed: HTMLElement | null =
+      target instanceof HTMLElement && target.shadowRoot
+        ? (target.shadowRoot.activeElement as HTMLElement | null) ?? target
+        : target;
+    const tag = composed?.tagName?.toLowerCase();
+    const isTextField =
+      tag === 'input' ||
+      tag === 'textarea' ||
+      tag === 'select' ||
+      composed?.isContentEditable === true;
+    if (isTextField) {
+      e.preventDefault();
+      composed?.blur();
+      return;
+    }
+    if (this.route !== 'home') {
+      e.preventDefault();
+      this.goHome();
+    }
+  };
+
   connectedCallback() {
     super.connectedCallback();
     // 初始化主题与语言
@@ -187,6 +221,8 @@ export class AevumApp extends LitElement {
       this.requestUpdate();
     });
     window.addEventListener('hashchange', this.onHashChange);
+    // 捕获阶段：确保在 md-select/md-menu 等 stopPropagation 之前仍能收到 Escape
+    window.addEventListener('keydown', this.onGlobalKeydown, { capture: true });
     this.onHashChange();
   }
 
@@ -196,6 +232,7 @@ export class AevumApp extends LitElement {
     this.unsubLocale?.();
     this.unsubInstall?.();
     window.removeEventListener('hashchange', this.onHashChange);
+    window.removeEventListener('keydown', this.onGlobalKeydown, { capture: true });
   }
 
   private applyAll() {

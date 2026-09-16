@@ -42,7 +42,7 @@
 ### 体验
 
 - **中英文界面**：跟随系统或手动切换，词典式 i18n。
-- **无障碍**：日历式日期选择器支持键盘导航（方向键 / Home / End / PageUp·Down）与读屏语义（role=grid、sr-only 操作提示）；支持本地化周起始日与多历法月份切换；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
+- **无障碍**：日历式日期选择器实现完整 WAI-ARIA Grid 键盘模型（方向键移动、Home/End 本周首末、Ctrl+Home/End 本月首末、PageUp·Down 换月、Shift+PageUp·Down 换年、Enter/Space 选择）与读屏语义（role=grid、sr-only 操作提示）；年份/月份选择视图同样可全程键盘操作（方向键移动、Enter 选择、Esc 返回，焦点自动移入视图并在返回时交还日期网格）；应用级 Esc 分级返回（对话框/菜单优先处理 → 文本框失焦 → 子页面返回主页）；支持本地化周起始日与多历法月份切换；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
 - **PWA 离线可用**：可安装到主屏，无网络也能查看。
 
 ## 技术栈

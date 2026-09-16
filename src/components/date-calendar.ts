@@ -27,6 +27,7 @@ import { icon } from '../icons.js';
 
 const GRID_ID = 'aevum-cal-grid';
 const HINT_ID = 'aevum-cal-hint';
+const YM_HINT_ID = 'aevum-cal-ym-hint';
 
 /** 视图模式：日期网格 / 年份选择 / 月份选择 */
 type ViewMode = 'days' | 'years' | 'months';
@@ -390,6 +391,10 @@ export class DateCalendar extends LitElement {
   @state() private yearScrollKey = '';
   /** 标记一次键盘导航后需要把 DOM 焦点移到指定日格 */
   private pendingFocus = false;
+  /** 年份/月份视图打开后需将 DOM 焦点移入选中/当前项（视图切换时原按钮被销毁，焦点会掉到 body） */
+  @state() private ymFocusPending = false;
+  /** 年份/月份视图中键盘焦点所在的键（roving tabindex 跟随浏览位置而非固定在选中项） */
+  @state() private ymFocusKey = '';
   /** 上次用于初始化视图的 value，避免视图被已选值反复重置 */
   private lastValue = '';
 
@@ -421,6 +426,17 @@ export class DateCalendar extends LitElement {
       );
       el?.scrollIntoView({ block: 'center', behavior: 'auto' });
       this.yearScrollKey = '';
+    }
+    // 年份/月份视图打开后，把 DOM 焦点移入选中/当前项（否则焦点掉到 body，键盘完全不可用）
+    if (this.ymFocusPending) {
+      this.ymFocusPending = false;
+      if (this.viewMode === 'years' || this.viewMode === 'months') {
+        const keySel = `[data-year-key="${CSS.escape(this.ymFocusKey)}"],[data-month-key="${CSS.escape(this.ymFocusKey)}"]`;
+        const el = this.shadowRoot?.querySelector<HTMLElement>(keySel)
+          ?? this.shadowRoot?.querySelector<HTMLElement>('[tabindex="0"]');
+        el?.focus();
+        el?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      }
     }
     void changed;
   }
@@ -565,6 +581,7 @@ export class DateCalendar extends LitElement {
     this.viewMonthKey = sel.monthKey;
     this.focusKey = toISO(now);
     this.viewMode = 'days';
+    this.pendingFocus = true;
     this.requestUpdate();
   }
 
@@ -586,8 +603,13 @@ export class DateCalendar extends LitElement {
     this.emit(d);
   }
 
-  /** 网格键盘导航：方向键/Home/End/PageUp/PageDown
-   *  Ctrl+Home / Ctrl+End：切换上/下年 */
+  /**
+   * 日期网格键盘导航（WAI-ARIA APG Grid 模式）：
+   * - 方向键：按周历网格移动一日
+   * - Home / End：本月首日 / 末日
+   * - PageUp / PageDown：上 / 下月；Shift+PageUp / Shift+PageDown：上 / 下年
+   * （不占用 Ctrl+Home/End：那是编辑器与文本域的「跳到开头/结尾」全局习惯键）
+   */
   private onGridKeydown(e: KeyboardEvent) {
     const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.calLocale);
     if (!cells.length) return;
@@ -611,21 +633,26 @@ export class DateCalendar extends LitElement {
       case 'ArrowUp':
         nextPd = curPd.subtract({ days: 7 });
         break;
-      case 'Home':
-        // Home: 前一年
-        this.stepYear(-1);
-        e.preventDefault();
-        return;
-      case 'End':
-        // End: 后一年
-        this.stepYear(1);
-        e.preventDefault();
-        return;
+      case 'Home': {
+        // Home: 本月首日
+        nextPd = curPd.subtract({ days: curPd.day - 1 });
+        break;
+      }
+      case 'End': {
+        // End: 本月末日
+        nextPd = curPd.add({ days: curPd.daysInMonth - curPd.day });
+        break;
+      }
       case 'PageUp':
-        nextPd = curPd.subtract({ months: 1 });
+        // Shift+PageUp: 上一年；PageUp: 上个月
+        nextPd = e.shiftKey
+          ? curPd.subtract({ years: 1 })
+          : curPd.subtract({ months: 1 });
         break;
       case 'PageDown':
-        nextPd = curPd.add({ months: 1 });
+        nextPd = e.shiftKey
+          ? curPd.add({ years: 1 })
+          : curPd.add({ months: 1 });
         break;
       default:
         return; // Enter/Space 等交给按钮默认行为触发选择
@@ -658,12 +685,29 @@ export class DateCalendar extends LitElement {
   /** 打开年份选择视图，并滚动到当前选中年份 */
   private openYearView() {
     this.viewMode = 'years';
+    // 焦点初始落点：选中年优先，缺省为当前年（与 roving tabindex 的 tabindex=0 一致）
+    this.ymFocusKey = this.viewYearKey;
+    this.ymFocusPending = true;
     this.yearScrollKey = this.viewYearKey;
   }
 
   /** 打开月份选择视图 */
   private openMonthView() {
     this.viewMode = 'months';
+    this.ymFocusKey = this.viewMonthKey;
+    this.ymFocusPending = true;
+  }
+
+  /** 从年份/月份视图返回日期网格，并把焦点移回日期网格 */
+  private returnToDays(resetToToday = false) {
+    if (resetToToday) {
+      // 经「今天」按钮返回：视图重置到今天所在月，jumpToday 已含 requestUpdate
+      this.jumpToday();
+      return;
+    }
+    this.viewMode = 'days';
+    this.pendingFocus = true;
+    this.requestUpdate();
   }
 
   /** 在年份视图中选择某年，返回日期网格 */
@@ -674,93 +718,80 @@ export class DateCalendar extends LitElement {
     if (!months.some((m) => m.key === this.viewMonthKey)) {
       this.viewMonthKey = months[0].key;
     }
-    this.viewMode = 'days';
     this.reseatFocusAfterViewChange(this.currentFocusDay());
-    this.pendingFocus = true;
-    this.requestUpdate();
+    this.returnToDays();
   }
 
   /** 在月份视图中选择某月，返回日期网格 */
   private selectMonth(monthKey: string) {
     this.viewMonthKey = monthKey;
-    this.viewMode = 'days';
     this.reseatFocusAfterViewChange(this.currentFocusDay());
-    this.pendingFocus = true;
-    this.requestUpdate();
+    this.returnToDays();
   }
 
-  /** 年份视图键盘导航：方向键移动焦点，Enter 选择，Escape 返回 */
-  private onYearGridKeydown(e: KeyboardEvent) {
+  /** 计算年份视图焦点初始落点的 yearKey（选中/当前年不存在时取网格首项） */
+  private yearFocusTargetKey(): string {
+    const years = yearOptions(this.calendar, this.refDate, this.calLocale);
+    if (years.some((y) => y.key === this.viewYearKey)) return this.viewYearKey;
+    return years[0]?.key ?? '';
+  }
+
+  /** 焦点/浏览位置同步：roving tabindex 跟随 DOM 焦点（含程序化 focus 移动） */
+  private onYmCellFocus(e: FocusEvent) {
+    const el = e.target as HTMLElement;
+    const key = el.getAttribute('data-year-key') ?? el.getAttribute('data-month-key');
+    if (key) this.ymFocusKey = key;
+  }
+
+  /** 通用网格键盘处理器：在 cells（DOM 顺序即浏览顺序）上做 roving 导航
+   *  cols=每行列数，dataAttr=定位当前项的 data 属性名 */
+  private onYmNavKeydown(
+    e: KeyboardEvent,
+    cells: HTMLButtonElement[],
+    curAttr: string,
+    cols: number
+  ) {
     const target = e.target as HTMLElement;
-    if (!target.dataset.yearKey) return;
-    const cells = Array.from(
-      this.shadowRoot?.querySelectorAll<HTMLButtonElement>('[data-year-key]') ?? []
-    );
-    const idx = cells.findIndex((c) => c.dataset.yearKey === target.dataset.yearKey);
+    const curKey = target.getAttribute(curAttr) ?? '';
+    const idx = cells.findIndex((c) => c.getAttribute(curAttr) === curKey);
     if (idx < 0) return;
     let nextIdx = idx;
     switch (e.key) {
       case 'ArrowRight': nextIdx = Math.min(idx + 1, cells.length - 1); break;
       case 'ArrowLeft': nextIdx = Math.max(idx - 1, 0); break;
-      case 'ArrowDown': nextIdx = Math.min(idx + 3, cells.length - 1); break;
-      case 'ArrowUp': nextIdx = Math.max(idx - 3, 0); break;
+      case 'ArrowDown': nextIdx = Math.min(idx + cols, cells.length - 1); break;
+      case 'ArrowUp': nextIdx = Math.max(idx - cols, 0); break;
       case 'Home': nextIdx = 0; break;
       case 'End': nextIdx = cells.length - 1; break;
-      case 'Enter':
-      case ' ':
+      case 'Escape': {
         e.preventDefault();
-        this.selectYear(target.dataset.yearKey);
+        this.returnToDays();
         return;
-      case 'Escape':
-        e.preventDefault();
-        this.viewMode = 'days';
-        this.requestUpdate();
-        return;
+      }
       default:
-        return;
+        return; // Enter/Space 交给按钮默认行为
     }
     if (nextIdx !== idx) {
       e.preventDefault();
       cells[nextIdx]?.focus();
-      // 滚动到可见
       cells[nextIdx]?.scrollIntoView({ block: 'nearest', behavior: 'auto' });
     }
   }
 
+  /** 年份视图键盘导航：方向键移动焦点，Enter 选择，Escape 返回 */
+  private onYearGridKeydown(e: KeyboardEvent) {
+    const cells = Array.from(
+      this.shadowRoot?.querySelectorAll<HTMLButtonElement>('[data-year-key]') ?? []
+    );
+    this.onYmNavKeydown(e, cells, 'data-year-key', 3);
+  }
+
   /** 月份视图键盘导航：方向键移动焦点，Enter 选择，Escape 返回 */
   private onMonthGridKeydown(e: KeyboardEvent) {
-    const target = e.target as HTMLElement;
-    if (!target.dataset.monthKey) return;
     const cells = Array.from(
       this.shadowRoot?.querySelectorAll<HTMLButtonElement>('[data-month-key]') ?? []
     );
-    const idx = cells.findIndex((c) => c.dataset.monthKey === target.dataset.monthKey);
-    if (idx < 0) return;
-    let nextIdx = idx;
-    switch (e.key) {
-      case 'ArrowRight': nextIdx = Math.min(idx + 1, cells.length - 1); break;
-      case 'ArrowLeft': nextIdx = Math.max(idx - 1, 0); break;
-      case 'ArrowDown': nextIdx = Math.min(idx + 3, cells.length - 1); break;
-      case 'ArrowUp': nextIdx = Math.max(idx - 3, 0); break;
-      case 'Home': nextIdx = 0; break;
-      case 'End': nextIdx = cells.length - 1; break;
-      case 'Enter':
-      case ' ':
-        e.preventDefault();
-        this.selectMonth(target.dataset.monthKey);
-        return;
-      case 'Escape':
-        e.preventDefault();
-        this.viewMode = 'days';
-        this.requestUpdate();
-        return;
-      default:
-        return;
-    }
-    if (nextIdx !== idx) {
-      e.preventDefault();
-      cells[nextIdx]?.focus();
-    }
+    this.onYmNavKeydown(e, cells, 'data-month-key', 3);
   }
 
   /** 渲染年份选择视图 */
@@ -768,6 +799,10 @@ export class DateCalendar extends LitElement {
     const years = yearOptions(this.calendar, this.refDate, this.calLocale);
     const todayYearKey = keysFromGregorian(new Date(), this.calendar).yearKey;
     const selYearKey = this.viewYearKey;
+    // roving tabindex 锚点：优先键盘浏览位置，其次选中年（与打开视图时的初始焦点一致）
+    const navKey = this.ymFocusKey && years.some((y) => y.key === this.ymFocusKey)
+      ? this.ymFocusKey
+      : this.yearFocusTargetKey();
 
     // 拆分显示：年份的 display 可能含额外文字（如 "2026年 丙午年"），取前半部分
     return html`
@@ -775,24 +810,27 @@ export class DateCalendar extends LitElement {
         class="view-panel"
         role="grid"
         aria-label=${t('calSelectYear')}
+        aria-describedby=${YM_HINT_ID}
         @keydown=${this.onYearGridKeydown}
       >
         <div class="view-header">
           <span class="view-title">${t('calSelectYear')}</span>
         </div>
-        <div class="year-grid">
+        <div class="year-grid" role="row">
           ${years.map((y) => {
             const isSel = y.key === selYearKey;
             const isCur = y.key === todayYearKey;
+            const isNav = y.key === navKey;
             return html`
               <button
                 class="year-cell ${isSel ? 'selected' : ''} ${isCur ? 'current' : ''}"
                 type="button"
                 role="gridcell"
                 data-year-key=${y.key}
-                tabindex=${isSel ? '0' : '-1'}
+                tabindex=${isNav ? '0' : '-1'}
                 aria-selected=${isSel ? 'true' : 'false'}
                 @click=${() => this.selectYear(y.key)}
+                @focus=${this.onYmCellFocus}
               >
                 ${y.display}
               </button>
@@ -809,30 +847,36 @@ export class DateCalendar extends LitElement {
     const selMonthKey = this.viewMonthKey;
     const todayKeys = startOfMonthKeys(new Date(), this.calendar);
     const isTodayYear = todayKeys.yearKey === this.viewYearKey;
+    const navKey = this.ymFocusKey && months.some((m) => m.key === this.ymFocusKey)
+      ? this.ymFocusKey
+      : selMonthKey;
 
     return html`
       <div
         class="view-panel"
         role="grid"
         aria-label=${t('calSelectMonth')}
+        aria-describedby=${YM_HINT_ID}
         @keydown=${this.onMonthGridKeydown}
       >
         <div class="view-header">
           <span class="view-title">${t('calSelectMonth')}</span>
         </div>
-        <div class="month-grid">
+        <div class="month-grid" role="row">
           ${months.map((m) => {
             const isSel = m.key === selMonthKey;
             const isCur = isTodayYear && m.key === todayKeys.monthKey;
+            const isNav = m.key === navKey;
             return html`
               <button
                 class="month-cell ${isSel ? 'selected' : ''} ${isCur ? 'current' : ''}"
                 type="button"
                 role="gridcell"
                 data-month-key=${m.key}
-                tabindex=${isSel ? '0' : '-1'}
+                tabindex=${isNav ? '0' : '-1'}
                 aria-selected=${isSel ? 'true' : 'false'}
                 @click=${() => this.selectMonth(m.key)}
+                @focus=${this.onYmCellFocus}
               >
                 ${m.display}
               </button>
@@ -851,7 +895,7 @@ export class DateCalendar extends LitElement {
       return html`
         <div class="picker">
           <div class="header">
-            <button class="nav" type="button" aria-label=${t('actionBack')} @click=${() => { this.viewMode = 'days'; this.requestUpdate(); }}>
+            <button class="nav" type="button" aria-label=${t('actionBack')} @click=${() => this.returnToDays()}>
               ${icon('back', 20)}
             </button>
             <div class="title-group">
@@ -860,8 +904,9 @@ export class DateCalendar extends LitElement {
             <span class="nav" style="visibility:hidden"></span>
           </div>
           ${this.renderYearView()}
+          <p class="hint" id=${YM_HINT_ID}>${t('calYearMonthKeyboardHint')}</p>
           <div class="footer">
-            <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>
+            <button class="today-btn" type="button" @click=${() => this.returnToDays(true)}>${t('calToday')}</button>
           </div>
         </div>
       `;
@@ -873,7 +918,7 @@ export class DateCalendar extends LitElement {
       return html`
         <div class="picker">
           <div class="header">
-            <button class="nav" type="button" aria-label=${t('actionBack')} @click=${() => { this.viewMode = 'days'; this.requestUpdate(); }}>
+            <button class="nav" type="button" aria-label=${t('actionBack')} @click=${() => this.returnToDays()}>
               ${icon('back', 20)}
             </button>
             <div class="title-group">
@@ -882,8 +927,9 @@ export class DateCalendar extends LitElement {
             <span class="nav" style="visibility:hidden"></span>
           </div>
           ${this.renderMonthView()}
+          <p class="hint" id=${YM_HINT_ID}>${t('calYearMonthKeyboardHint')}</p>
           <div class="footer">
-            <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>
+            <button class="today-btn" type="button" @click=${() => this.returnToDays(true)}>${t('calToday')}</button>
           </div>
         </div>
       `;
