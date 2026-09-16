@@ -49,6 +49,7 @@ import {
   applyCustomTheme,
 } from '../store/themes.js';
 import { onLocaleChange, t } from '../i18n.js';
+import { COMMIT_ID } from '../version.js';
 import { CALENDAR_IDS } from '../utils/calendar.js';
 import { exportBackup, importBackup } from '../utils/backup.js';
 import { icon } from '../icons.js';
@@ -313,6 +314,22 @@ export class SettingsPage extends LitElement {
       padding: 4px 10px;
       border-radius: 999px;
       white-space: nowrap;
+    }
+    .build-footer {
+      margin: 24px 4px 12px;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--md-sys-color-on-surface-variant);
+    }
+    .build-footer a {
+      color: inherit;
+      text-decoration: underline;
+      text-underline-offset: 3px;
+    }
+    .build-footer a:focus-visible {
+      outline: 2px solid var(--md-sys-color-primary);
+      outline-offset: 2px;
+      border-radius: 4px;
     }
   `;
 
@@ -834,6 +851,19 @@ export class SettingsPage extends LitElement {
           </div>
         </div>
       </div>
+
+      ${COMMIT_ID
+        ? html`<footer class="build-footer">
+            ${t('buildCommitLabel')}:
+            <a
+              href="https://github.com/308K/aevum/commit/${COMMIT_ID}"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label=${t('buildCommitAria', { commit: COMMIT_ID })}
+              >${COMMIT_ID}</a
+            >
+          </footer>`
+        : ''}
 
       <md-dialog id="tagDeleteDialog">
         <div slot="headline">${t('tagDeleteConfirmTitle')}</div>

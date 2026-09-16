@@ -205,6 +205,8 @@ export const zhCN = {
   dataExport: '导出备份',
   dataImport: '导入备份',
   dataHint: '导出全部事件与设置为JSON文件；导入将覆盖当前所有事件',
+  buildCommitLabel: '构建版本',
+  buildCommitAria: '当前部署对应的commit id：{commit}',
   toastExported: '已导出备份文件',
   toastImported: '已导入{count}个事件',
   toastImportFailed: '导入失败：文件格式无效',

@@ -196,6 +196,8 @@ export const enUS: LocaleDict = {
   dataExport: 'Export backup',
   dataImport: 'Import backup',
   dataHint: 'Export all events and settings to a JSON file; importing replaces all current events',
+  buildCommitLabel: 'Build',
+  buildCommitAria: 'Commit id of the current deployment: {commit}',
   toastExported: 'Backup exported',
   toastImported: 'Imported {count} events',
   toastImportFailed: 'Import failed: invalid file format',

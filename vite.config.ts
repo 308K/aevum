@@ -1,10 +1,27 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { execSync } from 'node:child_process';
+
+/** 构建期解析当前 commit 短 id：优先 Cloudflare Pages 的 COMMIT_REF，本地回退 git rev-parse */
+function resolveCommitId(): string {
+  const ref = process.env.COMMIT_REF || process.env.CF_PAGES_COMMIT_SHA;
+  if (ref) return ref.slice(0, 7);
+  try {
+    return execSync('git rev-parse --short HEAD', { stdio: ['ignore', 'pipe', 'ignore'] })
+      .toString()
+      .trim();
+  } catch {
+    return '';
+  }
+}
 
 export default defineConfig({
   base: './',
   build: {
     target: 'es2022',
+  },
+  define: {
+    __COMMIT_ID__: JSON.stringify(resolveCommitId()),
   },
   plugins: [
     VitePWA({

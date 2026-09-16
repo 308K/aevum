@@ -110,6 +110,10 @@ deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts
 
 PWA（service worker + manifest）由 vite-plugin-pwa 自动生成，构建后含 `sw.js` 与 Web App Manifest。
 
+### 构建版本页脚
+
+设置页页脚展示当前部署对应的 commit id（链接到 GitHub 仓库的对应 commit）。构建期通过 `vite.config.ts` 的 `define` 注入：优先取 Cloudflare Pages 的 `COMMIT_REF` 环境变量，本地构建回退 `git rev-parse --short HEAD`；两者均不可用时页脚自动隐藏。
+
 ## 项目结构
 
 ```
