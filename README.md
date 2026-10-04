@@ -42,7 +42,8 @@
 ### 体验
 
 - **中英文界面**：跟随系统或手动切换，词典式 i18n。
-- **无障碍**：日历式日期选择器实现完整 WAI-ARIA Grid 键盘模型（方向键移动、Home/End 本周首末、Ctrl+Home/End 本月首末、PageUp·Down 换月、Shift+PageUp·Down 换年、Enter/Space 选择）与读屏语义（role=grid、sr-only 操作提示）；年份/月份选择视图同样可全程键盘操作（方向键移动、Enter 选择、Esc 返回，焦点自动移入视图并在返回时交还日期网格）；应用级 Esc 分级返回（对话框/菜单优先处理 → 文本框失焦 → 子页面返回主页）；支持本地化周起始日与多历法月份切换；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
+- **无障碍**：日历式日期选择器实现完整 WAI-ARIA Grid 键盘模型（方向键移动、Home/End 本月首末、PageUp·Down 换月、Shift+PageUp·Down 换年、Enter/Space 选择）与读屏语义（role=grid、sr-only 操作提示）；年份/月份选择视图同样可全程键盘操作（方向键移动、Enter 选择、Esc 返回，焦点自动移入视图并在返回时交还日期网格）；应用级 Esc 分级返回（对话框/菜单优先处理 → 文本框失焦 → 子页面返回主页）；支持本地化周起始日与多历法月份切换；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
+- **手势翻页**：日期网格支持左右滑动切换月份，拖拽实时跟手（超过视口一半后加阻尼），松手按位移（44px）或速度（0.35px/ms 轻扫）判定翻页，不足则弹回；纵向滑动仍交还页面滚动，翻页后的 click 会被拦截以免误选日期。
 - **PWA 离线可用**：可安装到主屏，无网络也能查看。
 
 ## 技术栈
@@ -155,7 +156,7 @@ aevum/
     │   ├── event-card.ts       # 事件卡片
     │   ├── event-detail.ts     # 事件详情弹窗
     │   ├── time-display.ts     # 时间展示（消费计算层结果）
-    │   ├── date-calendar.ts    # 日历式日期选择器（键盘导航 + ARIA）
+    │   ├── date-calendar.ts    # 日历式日期选择器（键盘导航 + 滑动翻页 + ARIA）
     │   ├── color-picker.ts     # 主题色选择器
     │   └── app-snackbar.ts     # Snackbar 提示
     ├── pages/                  # 页面
@@ -176,6 +177,7 @@ aevum/
     │   ├── share-image.ts      # 事件分享图离屏渲染
     │   ├── image-file.ts       # 图片压缩处理
     │   ├── app-icon.ts        # 应用图标动态生成
+    │   ├── swipe.ts            # 滑动翻页手势判定（主轴 / 翻页阈值 / 阻尼）
     │   └── format.ts           # 格式化辅助
     └── locales/                # 国际化词典
         ├── zh-CN.ts            # 简体中文
@@ -225,7 +227,7 @@ AevumApp (app.ts) ── 哈希路由
 - 所有可见 UI 文案必须通过 `t(key)` 走 i18n，禁止硬编码
 - 图标使用 `src/icons.ts` 内联 SVG，禁止 emoji 或外部图标字体
 - 历法与时间计算一律走 TC39 Temporal API（通过 `src/utils/temporal.ts` 桥接），禁止引入重型日期库
-- 修改 `utils/calendar.ts`、`utils/time-calc.ts`、`store/` 后运行 `bun run test` 确保无回归
+- 修改 `utils/calendar.ts`、`utils/time-calc.ts`、`utils/swipe.ts`、`store/` 后运行 `bun run test` 确保无回归
 - 主题色由种子色动态生成 M3 色阶，禁止硬编码色值覆盖动态主题
 - 新增语言须在 `src/locales/` 新建词典文件并注册到 `src/i18n.ts` 的 `DICTS`
 

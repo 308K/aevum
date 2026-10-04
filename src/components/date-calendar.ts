@@ -20,6 +20,13 @@ import {
   type CalDayCell,
 } from '../utils/calendar.js';
 import { Temporal } from '../utils/temporal.js';
+import {
+  applySwipeResistance,
+  resolveSwipeAxis,
+  resolveSwipePage,
+  SWIPE_ANIM_MS,
+  type SwipeAxis,
+} from '../utils/swipe.js';
 import type { CalendarId, WeekStart } from '../types.js';
 import { getLocale, t } from '../i18n.js';
 import { getSettings, onSettingsChange } from '../store/settings.js';
@@ -50,6 +57,10 @@ function fromISO(iso: string): Date | null {
   } catch {
     return null;
   }
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
 }
 
 /** 取某 locale 的每周首日列索引（0=周日 … 6=周六）
@@ -167,10 +178,26 @@ export class DateCalendar extends LitElement {
       color: var(--md-sys-color-on-surface-variant);
       padding: 4px 0;
     }
+    /* ---- 滑动翻页视口：纵向滚动交还浏览器，横向手势由组件处理 ---- */
+    .viewport {
+      overflow: hidden;
+      /* 只允许浏览器处理纵向平移，横向手势才会以 pointermove 送达组件 */
+      touch-action: pan-y;
+      -webkit-user-select: none;
+      user-select: none;
+      /* 负 margin 抵消 padding，使聚焦描边不被 overflow 裁掉 */
+      padding: 2px;
+      margin: -2px;
+    }
     .grid {
       display: flex;
       flex-direction: column;
       gap: 2px;
+      will-change: transform;
+    }
+    /* 仅在松手后的动画阶段开启过渡，拖拽过程必须即时跟手 */
+    .viewport.anim .grid {
+      transition: transform 200ms cubic-bezier(0.2, 0, 0, 1);
     }
     .grid-row {
       display: grid;
@@ -397,6 +424,22 @@ export class DateCalendar extends LitElement {
   @state() private ymFocusKey = '';
   /** 上次用于初始化视图的 value，避免视图被已选值反复重置 */
   private lastValue = '';
+
+  // ---- 滑动翻页 ----
+  /** 跟手位移（px）；翻页动画阶段为进出场位移 */
+  @state() private dragX = 0;
+  /** 是否处于进出场动画阶段（决定 .grid 是否启用 transition） */
+  @state() private animating = false;
+  /** 正在跟踪的指针 id，非 null 表示手势进行中 */
+  private swipePointerId: number | null = null;
+  private swipeStartX = 0;
+  private swipeStartY = 0;
+  private swipeStartT = 0;
+  private swipeAxis: SwipeAxis = 'none';
+  /** 滑动视口宽度缓存（px），手势开始时测量 */
+  private swipeWidth = 0;
+  /** 翻页后抑制随之而来的 click，避免误选日期 */
+  private suppressClick = false;
 
   willUpdate() {
     if (this.value && this.value !== this.lastValue) {
@@ -679,6 +722,137 @@ export class DateCalendar extends LitElement {
     }
     return cells[0] ? toISO(cells[0].greg) : '';
   }
+
+  // ---- 滑动翻页 ----
+
+  /** 视口宽度（px），取不到时返回 0 */
+  private viewportWidth(): number {
+    const el = this.shadowRoot?.querySelector<HTMLElement>('.viewport');
+    return el ? el.clientWidth : 0;
+  }
+
+  private onSwipePointerDown(e: PointerEvent) {
+    // 仅主键 / 单指；多指（缩放）不参与
+    if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    this.suppressClick = false;
+    this.swipePointerId = e.pointerId;
+    this.swipeStartX = e.clientX;
+    this.swipeStartY = e.clientY;
+    this.swipeStartT = e.timeStamp;
+    this.swipeAxis = 'none';
+    this.swipeWidth = this.viewportWidth();
+  }
+
+  private onSwipePointerMove(e: PointerEvent) {
+    if (this.swipePointerId !== e.pointerId) return;
+    const dx = e.clientX - this.swipeStartX;
+    const dy = e.clientY - this.swipeStartY;
+    if (this.swipeAxis === 'none') {
+      this.swipeAxis = resolveSwipeAxis(dx, dy);
+      // 纵向手势交还页面滚动，不拦截
+      if (this.swipeAxis === 'vertical') {
+        this.swipePointerId = null;
+        return;
+      }
+      if (this.swipeAxis === 'none') return;
+      // 横向手势：捕获指针，避免移出视口后丢失 move 事件
+      (e.currentTarget as HTMLElement | null)?.setPointerCapture?.(e.pointerId);
+    }
+    if (this.swipeAxis !== 'horizontal') return;
+    e.preventDefault();
+    this.dragX = applySwipeResistance(dx, this.swipeWidth);
+  }
+
+  private onSwipePointerUp(e: PointerEvent) {
+    if (this.swipePointerId !== e.pointerId) return;
+    this.swipePointerId = null;
+    if (this.swipeAxis !== 'horizontal') {
+      this.dragX = 0;
+      return;
+    }
+    const dx = e.clientX - this.swipeStartX;
+    const dt = e.timeStamp - this.swipeStartT;
+    const dir = resolveSwipePage(dx, dt);
+    if (dir === 0) {
+      this.springBack();
+      return;
+    }
+    this.suppressClick = true;
+    this.animatePageTurn(dir);
+  }
+
+  private onSwipePointerCancel(e: PointerEvent) {
+    if (this.swipePointerId !== e.pointerId) return;
+    this.swipePointerId = null;
+    this.swipeAxis = 'none';
+    this.dragX = 0;
+  }
+
+  /** 滑动未达阈值：弹回原位 */
+  private springBack() {
+    this.animating = true;
+    this.dragX = 0;
+    this.scheduleSettle();
+  }
+
+  /**
+   * 翻页动画：先把当前页推出视口，切换数据后再把新页从反方向推入。
+   * animating 类只控制 CSS transition 的开关，位移始终由 dragX 驱动；
+   * 每次改位移后都要等 Lit 完成一次渲染并强制回流，过渡才会真正播放。
+   */
+  private async animatePageTurn(dir: -1 | 1) {
+    const w = this.swipeWidth || this.viewportWidth();
+    // 1) 当前页推出：dir=1（下一月）向左推出，故取 -dir * w
+    this.animating = true;
+    this.dragX = -dir * w;
+    await this.updateComplete;
+    await delay(SWIPE_ANIM_MS);
+
+    // 2) 数据已切换到相邻月；新页先瞬时定位在 dir 一侧（此时关闭过渡）
+    this.stepMonth(dir);
+    this.animating = false;
+    this.dragX = dir * w;
+    await this.updateComplete;
+    void this.offsetWidth; // 强制回流，让下一次的位移变化被识别为过渡起点
+
+    // 3) 开启过渡，把新页推回原位
+    this.animating = true;
+    this.dragX = 0;
+    // 翻页重渲染会销毁原日格按钮，若焦点原本在网格内需移回新页对应日，
+    // 否则焦点会掉到 body，键盘用户将失去位置
+    const hadFocus = !!this.shadowRoot?.activeElement?.closest('.grid');
+    if (hadFocus) this.pendingFocus = true;
+    await this.updateComplete;
+    await delay(SWIPE_ANIM_MS);
+    this.animating = false;
+  }
+
+  /** 动画结束后清理 animating 标记 */
+  private scheduleSettle() {
+    window.setTimeout(async () => {
+      await this.updateComplete;
+      this.animating = false;
+      this.dragX = 0;
+    }, SWIPE_ANIM_MS);
+  }
+
+  /** 翻页后抑制随之而来的 click，避免落到日期格上误选 */
+  private onViewportClickCapture(e: Event) {
+    if (!this.suppressClick) return;
+    this.suppressClick = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }
+
+  /**
+   * 捕获阶段的 click 拦截器（稳定引用，避免每次渲染重建监听器）。
+   * 必须在捕获阶段吞掉：日期格的 click 处理器位于冒泡阶段，
+   * 若只在下方的 .viewport 上冒泡拦截，pickDay 早已执行。
+   */
+  private readonly captureClick = {
+    capture: true,
+    handleEvent: (e: Event) => this.onViewportClickCapture(e),
+  };
 
   // ---- 年份/月份选择视图相关 ----
 
@@ -1023,7 +1197,23 @@ export class DateCalendar extends LitElement {
         <!-- 键盘操作提示：置于网格之前，读屏先念提示再念日历 -->
         <p class="hint" id=${HINT_ID}>${t('calKeyboardHint')}</p>
 
-        <div class="grid" id=${GRID_ID} role="grid" aria-label=${`${yearDisplay} ${monthDisplay}`} aria-describedby=${HINT_ID} @keydown=${this.onGridKeydown}>
+        <div
+          class="viewport ${this.animating ? 'anim' : ''}"
+          @pointerdown=${this.onSwipePointerDown}
+          @pointermove=${this.onSwipePointerMove}
+          @pointerup=${this.onSwipePointerUp}
+          @pointercancel=${this.onSwipePointerCancel}
+          @click=${this.captureClick}
+        >
+        <div
+          class="grid"
+          id=${GRID_ID}
+          role="grid"
+          aria-label=${`${yearDisplay} ${monthDisplay}`}
+          aria-describedby=${HINT_ID}
+          style="transform: translateX(${this.dragX}px)"
+          @keydown=${this.onGridKeydown}
+        >
           <div class="weekdays" role="row">
             ${headers.map(
               (h) => html`<div class="wd" role="columnheader" aria-label=${h.long}>${h.narrow}</div>`
@@ -1039,6 +1229,7 @@ export class DateCalendar extends LitElement {
               )}
             </div>`
           )}
+        </div>
         </div>
 
         <div class="footer">

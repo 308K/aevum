@@ -41,7 +41,7 @@ export const enUS: LocaleDict = {
   calPrevMonth: 'Previous month',
   calNextMonth: 'Next month',
   calToday: 'Today',
-  calKeyboardHint: 'Use arrow keys to move between dates, Home and End for the first or last day of the month, PageUp and PageDown to change months, Shift+PageUp and Shift+PageDown to change years, and Enter or Space to select.',
+  calKeyboardHint: 'Use arrow keys to move between dates, Home and End for the first or last day of the month, PageUp and PageDown to change months, Shift+PageUp and Shift+PageDown to change years, and Enter or Space to select. You can also swipe left or right to change months.',
   calSelectYear: 'Select year',
   calSelectMonth: 'Select month',
   calYearMonthKeyboardHint: 'Use arrow keys to move between years and months, Home/End for first or last item, Enter or Space to select, and Escape to return to the calendar.',
