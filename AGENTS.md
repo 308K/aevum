@@ -51,11 +51,11 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 
 ## Vitest 测试
 项目已引入 **Vitest** 作为自动化测试框架，测试文件位于 `tests/` 目录：
-- `bun run test` —— 单次运行全部测试（360 条断言 + 2 skipped，约 1.5s）
+- `bun run test` —— 单次运行全部测试（370 条断言 + 2 skipped，约 1.5s）
 - `bun run test:watch` —— watch 模式
 - `bun run test:coverage` —— 带覆盖率报告
 - `tests/setup.ts` —— 注入 localStorage / navigator 垫片（node 环境无全局 localStorage）
 - Store 模块（`events.ts` / `settings.ts` / `tags.ts`）导出 `__resetForTesting()` 用于 `beforeEach` 重置内存缓存
 - `tests/calendar-registry.test.ts` —— 历法注册表守护：`islamic-rgsa` 清退迁移、`CALENDAR_IDS` 长度/无重复/无死项
-- `tests/swipe.test.ts` —— 滑动翻页手势判定：主轴区分、位移/速度翻页阈值、跟手阻尼单调性
+- `tests/swipe.test.ts` —— 滑动翻页：主轴区分、位移/速度翻页阈值、跟手阻尼单调性、轨道几何（面板数 × 视口宽换算、索引夹紧、越界除零防护）
 - **GitHub Actions CI**（`.github/workflows/ci.yml`）：push/PR 时自动运行 `bun install --frozen-lockfile` → `bun run typecheck` → `bun run test`

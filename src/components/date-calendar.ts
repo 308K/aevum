@@ -6,8 +6,10 @@
  * - 无障碍：role=grid 语义、roving tabindex、方向键/Home/End/PageUp/PageDown 键盘导航、
  *   每个日格提供完整日期的 aria-label、选中态用 aria-selected
  * - 快速跳转：点击表头年份/月份可展开年份网格视图与月份网格视图
+ * - 滑动翻页：三面板轨道预渲染 [前月, 当前月, 后月]，左右拖拽切换月份全程无白屏；
+ *   邻月面板整体 inert（不进读屏树、不可聚焦、不参与命中测试）
  */
-import { LitElement, html, css, type PropertyValues } from 'lit';
+import { LitElement, html, css, nothing, type PropertyValues } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
 import {
   monthCalendarDays,
@@ -24,6 +26,8 @@ import {
   applySwipeResistance,
   resolveSwipeAxis,
   resolveSwipePage,
+  trackGeometry,
+  trackTurnOffset,
   SWIPE_ANIM_MS,
   type SwipeAxis,
 } from '../utils/swipe.js';
@@ -38,6 +42,27 @@ const YM_HINT_ID = 'aevum-cal-ym-hint';
 
 /** 视图模式：日期网格 / 年份选择 / 月份选择 */
 type ViewMode = 'days' | 'years' | 'months';
+
+/** 历法年/月键对 */
+type YearMonth = { yearKey: string; monthKey: string };
+
+/** 单个面板（一个月）的渲染数据 */
+interface PanelData extends YearMonth {
+  /** 该月全部日格 */
+  cells: CalDayCell[];
+  /** 按 7 列切分后的行；null 为空白占位 */
+  rows: ({ cell: CalDayCell; muted: boolean } | null)[][];
+  /** 表头年份展示（可能含「干支年」等额外文字，内部含空格，不可按空格拆分） */
+  yearDisplay: string;
+  /** 表头月份展示 */
+  monthDisplay: string;
+  /** 读屏标签：年月标题拼接 */
+  label: string;
+  /** 是否为当前视图月（决定 tabindex / aria / inert） */
+  isCurrent: boolean;
+  /** 该面板内应获 tabindex=0 的日格 ISO；邻月面板恒为 ''（全部 -1） */
+  focusKey: string;
+}
 
 function toISO(d: Date): string {
   const pd = Temporal.PlainDate.from({
@@ -178,7 +203,7 @@ export class DateCalendar extends LitElement {
       color: var(--md-sys-color-on-surface-variant);
       padding: 4px 0;
     }
-    /* ---- 滑动翻页视口：纵向滚动交还浏览器，横向手势由组件处理 ---- */
+    /* ---- 滑动翻页：视口裁切 + 三面板轨道（相邻月预渲染，翻页无白屏） ---- */
     .viewport {
       overflow: hidden;
       /* 只允许浏览器处理纵向平移，横向手势才会以 pointermove 送达组件 */
@@ -189,14 +214,24 @@ export class DateCalendar extends LitElement {
       padding: 2px;
       margin: -2px;
     }
-    .grid {
+    /* 轨道宽度/位移由 render 按面板数内联给出（--track-w / --track-shift） */
+    .track {
+      display: flex;
+      align-items: flex-start;
+      width: var(--track-w, 300%);
+      margin-left: var(--track-shift, -100%);
+      will-change: transform;
+    }
+    /* 面板即 role=grid 容器：自身也是列布局，省掉中间层以保住 grid > row > gridcell 三层结构 */
+    .panel {
       display: flex;
       flex-direction: column;
       gap: 2px;
-      will-change: transform;
+      flex: none;
+      width: var(--panel-w, 33.3333%);
     }
     /* 仅在松手后的动画阶段开启过渡，拖拽过程必须即时跟手 */
-    .viewport.anim .grid {
+    .viewport.anim .track {
       transition: transform 200ms cubic-bezier(0.2, 0, 0, 1);
     }
     .grid-row {
@@ -428,7 +463,7 @@ export class DateCalendar extends LitElement {
   // ---- 滑动翻页 ----
   /** 跟手位移（px）；翻页动画阶段为进出场位移 */
   @state() private dragX = 0;
-  /** 是否处于进出场动画阶段（决定 .grid 是否启用 transition） */
+  /** 是否处于进出场动画阶段（决定 .track 是否启用 transition） */
   @state() private animating = false;
   /** 正在跟踪的指针 id，非 null 表示手势进行中 */
   private swipePointerId: number | null = null;
@@ -438,8 +473,13 @@ export class DateCalendar extends LitElement {
   private swipeAxis: SwipeAxis = 'none';
   /** 滑动视口宽度缓存（px），手势开始时测量 */
   private swipeWidth = 0;
-  /** 翻页后抑制随之而来的 click，避免误选日期 */
-  private suppressClick = false;
+  /** 翻页后抑制 click 的截止时间戳（ms）；期间到达的 click 视为翻页误触 */
+  private suppressClickUntil = 0;
+  /** 上次渲染的轨道面板数（1~3），历法边界处可能不足 3 个 */
+  private panelCount = 1;
+  /** 上次渲染时轨道是否含前月 / 后月（历法枚举边界处可能缺失） */
+  private hasPrev = false;
+  private hasNext = false;
 
   willUpdate() {
     if (this.value && this.value !== this.lastValue) {
@@ -457,8 +497,13 @@ export class DateCalendar extends LitElement {
   }
 
   protected updated(changed: PropertyValues) {
+    // 三个面板都渲染 data-iso 日格（相邻月的灰日与当前月日期会重叠，
+    // 例如 1 月 1 日也出现在 12 月面板的尾部），因此焦点查询必须限定在
+    // 当前面板内——只有它带唯一的 GRID_ID，不能用 .panel 或 role=grid 筛选。
     if (this.pendingFocus && this.focusKey && this.viewMode === 'days') {
-      const el = this.shadowRoot?.querySelector<HTMLButtonElement>(`[data-iso="${this.focusKey}"]`);
+      const el = this.shadowRoot?.querySelector<HTMLButtonElement>(
+        `#${GRID_ID} [data-iso="${this.focusKey}"]`
+      );
       el?.focus();
       this.pendingFocus = false;
     }
@@ -549,24 +594,28 @@ export class DateCalendar extends LitElement {
    * 日本和历允许重复月份（如昭和64年1月与平成元年1月同为 1989-01），
    * 导航时需跳过映射到同一公历月的条目，否则会出现「两个1月」。
    */
-  private findAdjacentMonth(delta: number): { yearKey: string; monthKey: string } | null {
+  private findAdjacentMonthFrom(
+    yearKey: string,
+    monthKey: string,
+    delta: number
+  ): { yearKey: string; monthKey: string } | null {
     const years = yearOptions(this.calendar, this.refDate, this.calLocale);
-    const curCells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, this.calLocale);
+    const curCells = monthCalendarDays(this.calendar, yearKey, monthKey, this.calLocale);
     const curGregId = curCells.length
       ? `${curCells[0].greg.getFullYear()}-${curCells[0].greg.getMonth()}`
       : '';
 
-    const yi = years.findIndex((y) => y.key === this.viewYearKey);
+    const yi = years.findIndex((y) => y.key === yearKey);
     if (yi < 0) return null;
 
     // 先在当前年份的剩余月份中搜索
-    const curMonths = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-    const mi = curMonths.findIndex((m) => m.key === this.viewMonthKey);
+    const curMonths = monthOptions(this.calendar, yearKey, this.calLocale);
+    const mi = curMonths.findIndex((m) => m.key === monthKey);
     for (let i = mi + delta; i >= 0 && i < curMonths.length; i += delta) {
-      const cells = monthCalendarDays(this.calendar, this.viewYearKey, curMonths[i].key, this.calLocale);
+      const cells = monthCalendarDays(this.calendar, yearKey, curMonths[i].key, this.calLocale);
       if (cells.length) {
         const id = `${cells[0].greg.getFullYear()}-${cells[0].greg.getMonth()}`;
-        if (id !== curGregId) return { yearKey: this.viewYearKey, monthKey: curMonths[i].key };
+        if (id !== curGregId) return { yearKey, monthKey: curMonths[i].key };
       }
     }
 
@@ -585,6 +634,11 @@ export class DateCalendar extends LitElement {
     }
 
     return null;
+  }
+
+  /** 取得相对当前视图偏移 delta（±1）个月的年/月键；越界或映射到同一公历月时返回 null */
+  private findAdjacentMonth(delta: number): YearMonth | null {
+    return this.findAdjacentMonthFrom(this.viewYearKey, this.viewMonthKey, delta);
   }
 
   private stepMonth(delta: number) {
@@ -610,11 +664,6 @@ export class DateCalendar extends LitElement {
     }
     this.reseatFocusAfterViewChange(oldDay);
     this.requestUpdate();
-  }
-
-  /** 取得相对当前视图偏移 delta（±1）个月的年/月键；越界或映射到同一公历月时返回 null */
-  private adjacentMonthKeys(delta: number): { yearKey: string; monthKey: string } | null {
-    return this.findAdjacentMonth(delta);
   }
 
   private jumpToday() {
@@ -723,7 +772,96 @@ export class DateCalendar extends LitElement {
     return cells[0] ? toISO(cells[0].greg) : '';
   }
 
-  // ---- 滑动翻页 ----
+  // ---- 滑动翻页：面板轨道 ----
+
+  /**
+   * 组装单个月份面板的渲染数据。
+   * prev/next 面板与当前面板走完全相同的组装逻辑，保证翻页前后像素一致、无跳动。
+   * @param prevKeys/nextKeys 该面板自身的相邻月（用于补齐前导/后置灰日与跨月点击）
+   */
+  private buildPanel(
+    yearKey: string,
+    monthKey: string,
+    prevKeys: YearMonth | null,
+    nextKeys: YearMonth | null,
+    isCurrent: boolean
+  ): PanelData {
+    const calLocale = this.calLocale;
+    const cells = monthCalendarDays(this.calendar, yearKey, monthKey, calLocale);
+    const firstDOW = this.resolvedFirstDOW;
+
+    const leading = cells.length ? ((cells[0].greg.getDay() - firstDOW + 7) % 7) : 0;
+    const trailing = (7 - ((leading + cells.length) % 7)) % 7;
+
+    // 前导/后置：取相邻月份的真实日格，以灰色显示（而非空白占位）
+    const prevDays = prevKeys
+      ? monthCalendarDays(this.calendar, prevKeys.yearKey, prevKeys.monthKey, calLocale)
+      : [];
+    const nextDays = nextKeys
+      ? monthCalendarDays(this.calendar, nextKeys.yearKey, nextKeys.monthKey, calLocale)
+      : [];
+    const leadingCells = leading ? prevDays.slice(Math.max(0, prevDays.length - leading)) : [];
+    const trailingCells = trailing ? nextDays.slice(0, trailing) : [];
+
+    // 拼成 7 列网格（含相邻月灰色日），再按行切分
+    const flat: ({ cell: CalDayCell; muted: boolean } | null)[] = [
+      ...leadingCells.map((c) => ({ cell: c, muted: true })),
+      ...cells.map((c) => ({ cell: c, muted: false })),
+      ...trailingCells.map((c) => ({ cell: c, muted: true })),
+    ];
+    const rows: ({ cell: CalDayCell; muted: boolean } | null)[][] = [];
+    for (let i = 0; i < flat.length; i += 7) rows.push(flat.slice(i, i + 7));
+
+    // 表头跟随焦点日（或选中日）的真实年号（日本和历月中改元时与月首不同）
+    const focusKey = isCurrent ? this.effectiveFocusKey(cells) : '';
+    const anchor = fromISO(focusKey) ?? fromISO(this.value);
+    const headerYearKey = anchor && this.calendar === 'japanese'
+      ? keysFromGregorian(anchor, this.calendar).yearKey
+      : yearKey;
+    const headerMonthKey = anchor && this.calendar === 'japanese'
+      ? keysFromGregorian(anchor, this.calendar).monthKey
+      : monthKey;
+    const yearDisplay = yearOptions(this.calendar, this.refDate, calLocale)
+      .find((y) => y.key === headerYearKey)?.display
+      ?? formatYearMonthHeader(this.calendar, headerYearKey, headerMonthKey, calLocale);
+    const monthDisplay = monthOptions(this.calendar, headerYearKey, calLocale)
+      .find((m) => m.key === headerMonthKey)?.display
+      ?? monthKey;
+
+    return {
+      yearKey,
+      monthKey,
+      cells,
+      rows,
+      yearDisplay,
+      monthDisplay,
+      label: `${yearDisplay} ${monthDisplay}`,
+      isCurrent,
+      focusKey,
+    };
+  }
+
+  /**
+   * 构造轨道上要渲染的面板序列：[前月?, 当前月, 后月?]。
+   * 前月自身的前邻与后月的后邻用于补齐各自的灰日，越界则为 null。
+   */
+  private buildPanels(): PanelData[] {
+    const prev = this.findAdjacentMonth(-1);
+    const next = this.findAdjacentMonth(1);
+    const prevOfPrev = prev ? this.findAdjacentMonthFrom(prev.yearKey, prev.monthKey, -1) : null;
+    const nextOfNext = next ? this.findAdjacentMonthFrom(next.yearKey, next.monthKey, 1) : null;
+
+    const panels: PanelData[] = [];
+    if (prev) panels.push(this.buildPanel(prev.yearKey, prev.monthKey, prevOfPrev, this.currentYM(), false));
+    panels.push(this.buildPanel(this.viewYearKey, this.viewMonthKey, prev, next, true));
+    if (next) panels.push(this.buildPanel(next.yearKey, next.monthKey, this.currentYM(), nextOfNext, false));
+    return panels;
+  }
+
+  /** 当前视图月的年月键对 */
+  private currentYM(): YearMonth {
+    return { yearKey: this.viewYearKey, monthKey: this.viewMonthKey };
+  }
 
   /** 视口宽度（px），取不到时返回 0 */
   private viewportWidth(): number {
@@ -731,16 +869,39 @@ export class DateCalendar extends LitElement {
     return el ? el.clientWidth : 0;
   }
 
+  /** 当前视图月在轨道中的索引（0 起）；无前月时为 0 */
+  private currentPanelIndex(panels: PanelData[]): number {
+    return panels.findIndex((p) => p.isCurrent);
+  }
+
+  /**
+   * 轨道中是否存在 dir 方向的可翻面板。
+   * 历法枚举边界（yearOptions 的 ±100 年）处可能没有前月/后月。
+   */
+  private canSwipe(dir: -1 | 1): boolean {
+    if (this.panelCount < 2) return false;
+    return dir < 0 ? this.hasPrev : this.hasNext;
+  }
+
+  /** 单个面板的像素宽度（视口内每个面板恰为一个视口宽） */
+  private panelWidthPx(): number {
+    const el = this.shadowRoot?.querySelector<HTMLElement>('.panel');
+    if (el) {
+      const w = el.getBoundingClientRect().width;
+      if (w > 0) return w;
+    }
+    return this.viewportWidth();
+  }
+
   private onSwipePointerDown(e: PointerEvent) {
     // 仅主键 / 单指；多指（缩放）不参与
     if (!e.isPrimary || (e.pointerType === 'mouse' && e.button !== 0)) return;
-    this.suppressClick = false;
     this.swipePointerId = e.pointerId;
     this.swipeStartX = e.clientX;
     this.swipeStartY = e.clientY;
     this.swipeStartT = e.timeStamp;
     this.swipeAxis = 'none';
-    this.swipeWidth = this.viewportWidth();
+    this.swipeWidth = this.panelWidthPx();
   }
 
   private onSwipePointerMove(e: PointerEvent) {
@@ -773,11 +934,13 @@ export class DateCalendar extends LitElement {
     const dx = e.clientX - this.swipeStartX;
     const dt = e.timeStamp - this.swipeStartT;
     const dir = resolveSwipePage(dx, dt);
-    if (dir === 0) {
+    // 历法边界：目标面板未预渲染，无法翻页，直接弹回
+    if (dir === 0 || !this.canSwipe(dir)) {
       this.springBack();
       return;
     }
-    this.suppressClick = true;
+    // 仅在极短时间窗内拦截 click：既吞掉翻页尾随的误触，又不会吃掉下一次正常点击
+    this.suppressClickUntil = e.timeStamp + 400;
     this.animatePageTurn(dir);
   }
 
@@ -796,35 +959,28 @@ export class DateCalendar extends LitElement {
   }
 
   /**
-   * 翻页动画：先把当前页推出视口，切换数据后再把新页从反方向推入。
+   * 翻页动画：把轨道滑到相邻面板（相邻月已预渲染，全程无白屏），
+   * 动画结束后在关闭过渡的前提下换数据并归位——此刻新旧内容完全一致，用户不可见。
    * animating 类只控制 CSS transition 的开关，位移始终由 dragX 驱动；
    * 每次改位移后都要等 Lit 完成一次渲染并强制回流，过渡才会真正播放。
    */
   private async animatePageTurn(dir: -1 | 1) {
-    const w = this.swipeWidth || this.viewportWidth();
-    // 1) 当前页推出：dir=1（下一月）向左推出，故取 -dir * w
+    const w = this.swipeWidth || this.panelWidthPx();
+    // 1) 滑到相邻面板：dir=1（下一月）向左滑一个面板宽
     this.animating = true;
-    this.dragX = -dir * w;
+    this.dragX = trackTurnOffset(dir, w);
     await this.updateComplete;
     await delay(SWIPE_ANIM_MS);
 
-    // 2) 数据已切换到相邻月；新页先瞬时定位在 dir 一侧（此时关闭过渡）
+    // 2) 关闭过渡后换数据：新旧面板内容一致，切换不可见；随后归位
     this.stepMonth(dir);
     this.animating = false;
-    this.dragX = dir * w;
-    await this.updateComplete;
-    void this.offsetWidth; // 强制回流，让下一次的位移变化被识别为过渡起点
-
-    // 3) 开启过渡，把新页推回原位
-    this.animating = true;
     this.dragX = 0;
     // 翻页重渲染会销毁原日格按钮，若焦点原本在网格内需移回新页对应日，
     // 否则焦点会掉到 body，键盘用户将失去位置
-    const hadFocus = !!this.shadowRoot?.activeElement?.closest('.grid');
+    const hadFocus = !!this.shadowRoot?.activeElement?.closest('.panel');
     if (hadFocus) this.pendingFocus = true;
     await this.updateComplete;
-    await delay(SWIPE_ANIM_MS);
-    this.animating = false;
   }
 
   /** 动画结束后清理 animating 标记 */
@@ -838,8 +994,8 @@ export class DateCalendar extends LitElement {
 
   /** 翻页后抑制随之而来的 click，避免落到日期格上误选 */
   private onViewportClickCapture(e: Event) {
-    if (!this.suppressClick) return;
-    this.suppressClick = false;
+    if (performance.now() > this.suppressClickUntil) return;
+    this.suppressClickUntil = 0;
     e.stopPropagation();
     e.preventDefault();
   }
@@ -1110,8 +1266,6 @@ export class DateCalendar extends LitElement {
     }
 
     // 日期网格视图（默认）
-    const calLocale = this.calLocale;
-    const cells = monthCalendarDays(this.calendar, this.viewYearKey, this.viewMonthKey, calLocale);
     const firstDOW = this.resolvedFirstDOW;
 
     // 周列标题：以 2023-01-01（周日）为基准，按首日偏移归列；同时取窄/全称供可见与读屏使用
@@ -1128,45 +1282,26 @@ export class DateCalendar extends LitElement {
     const valDate = fromISO(this.value);
     const now = new Date();
 
-    const leading = cells.length ? ((cells[0].greg.getDay() - firstDOW + 7) % 7) : 0;
-    const trailing = (7 - ((leading + cells.length) % 7)) % 7;
+    // 轨道面板：[前月?, 当前月, 后月?]；相邻月已预渲染，滑动全程无白屏
+    const panels = this.buildPanels();
+    this.panelCount = panels.length;
+    this.hasPrev = panels.length > 0 && !panels[0].isCurrent;
+    this.hasNext = panels.length > 0 && !panels[panels.length - 1].isCurrent;
+    const curIdx = this.currentPanelIndex(panels);
+    const cur = panels[curIdx];
 
-    // 前导/后置：取相邻月份的真实日格，以灰色显示（而非空白占位）
-    const prev = this.adjacentMonthKeys(-1);
-    const next = this.adjacentMonthKeys(1);
-    const prevDays = prev ? monthCalendarDays(this.calendar, prev.yearKey, prev.monthKey, calLocale) : [];
-    const nextDays = next ? monthCalendarDays(this.calendar, next.yearKey, next.monthKey, calLocale) : [];
-    const leadingCells = leading ? prevDays.slice(Math.max(0, prevDays.length - leading)) : [];
-    const trailingCells = trailing ? nextDays.slice(0, trailing) : [];
+    // 轨道整体左移 curIdx 个面板宽，使当前面板与视口左边对齐
+    const geo = trackGeometry(panels.length, curIdx);
+    const trackStyle = [
+      `--track-w: ${geo.trackWidth}`,
+      `--track-shift: ${geo.trackShift}`,
+      `--panel-w: ${geo.panelWidth}`,
+      `transform: translateX(${this.dragX}px)`,
+    ].join('; ');
 
-    // 拼成 7 列网格（含相邻月灰色日），再按行切分
-    const flat: ({ cell: CalDayCell; muted: boolean } | null)[] = [
-      ...leadingCells.map((c) => ({ cell: c, muted: true })),
-      ...cells.map((c) => ({ cell: c, muted: false })),
-      ...trailingCells.map((c) => ({ cell: c, muted: true })),
-    ];
-    const rows: ({ cell: CalDayCell; muted: boolean } | null)[][] = [];
-    for (let i = 0; i < flat.length; i += 7) rows.push(flat.slice(i, i + 7));
-
-    const fk = this.effectiveFocusKey(cells);
-
-    // 拆分表头为年份和月份两部分，分别可点击
-    const yearOpts = yearOptions(this.calendar, this.refDate, this.calLocale);
-    const monthOpts = monthOptions(this.calendar, this.viewYearKey, this.calLocale);
-    // 日本和历月中改元时，焦点日可能属于与月首不同的年号年。
-    // 表头跟随焦点日（或选中日）的真实年号，而非固定用 viewYearKey。
-    const focusDate = fromISO(fk) ?? fromISO(this.value);
-    const headerYearKey = focusDate && this.calendar === 'japanese'
-      ? keysFromGregorian(focusDate, this.calendar).yearKey
-      : this.viewYearKey;
-    const headerMonthKey = focusDate && this.calendar === 'japanese'
-      ? keysFromGregorian(focusDate, this.calendar).monthKey
-      : this.viewMonthKey;
-    const yearDisplay = yearOpts.find((y) => y.key === headerYearKey)?.display
-      ?? formatYearMonthHeader(this.calendar, headerYearKey, headerMonthKey, this.calLocale);
-    const monthDisplay = monthOpts.find((m) => m.key === headerMonthKey)?.display
-      ?? monthOptions(this.calendar, headerYearKey, this.calLocale).find((m) => m.key === headerMonthKey)?.display
-      ?? this.viewMonthKey;
+    // 表头年份/月份拆分（点击可跳转），跟随焦点日真实年号
+    const yearDisplay = cur.yearDisplay;
+    const monthDisplay = cur.monthDisplay;
 
     return html`
       <div class="picker">
@@ -1205,36 +1340,56 @@ export class DateCalendar extends LitElement {
           @pointercancel=${this.onSwipePointerCancel}
           @click=${this.captureClick}
         >
-        <div
-          class="grid"
-          id=${GRID_ID}
-          role="grid"
-          aria-label=${`${yearDisplay} ${monthDisplay}`}
-          aria-describedby=${HINT_ID}
-          style="transform: translateX(${this.dragX}px)"
-          @keydown=${this.onGridKeydown}
-        >
-          <div class="weekdays" role="row">
-            ${headers.map(
-              (h) => html`<div class="wd" role="columnheader" aria-label=${h.long}>${h.narrow}</div>`
-            )}
+          <div class="track" style=${trackStyle}>
+            ${panels.map((p) => this.renderPanel(p, headers, valDate, now))}
           </div>
-
-          ${rows.map(
-            (row) => html`<div class="grid-row" role="row">
-              ${row.map((entry) =>
-                entry
-                  ? this.renderDay(entry.cell, entry.muted, valDate, now, fk, `${yearDisplay} ${monthDisplay}`)
-                  : html`<span class="empty" role="gridcell" aria-disabled="true"></span>`
-              )}
-            </div>`
-          )}
-        </div>
         </div>
 
         <div class="footer">
           <button class="today-btn" type="button" @click=${() => this.jumpToday()}>${t('calToday')}</button>
         </div>
+      </div>
+    `;
+  }
+
+  /**
+   * 渲染单个月份面板。
+   * 邻月面板整体 inert + aria-hidden：不可聚焦、不进读屏树、不参与命中测试，
+   * 因此预渲染相邻月既不污染无障碍语义，也不会误触发点击。
+   * role="grid" 保留在每个面板上，保证 grid > row > gridcell 三层结构完整。
+   */
+  private renderPanel(
+    p: PanelData,
+    headers: { narrow: string; long: string }[],
+    valDate: Date | null,
+    now: Date
+  ) {
+    return html`
+      <div
+        class="panel"
+        role="grid"
+        id=${p.isCurrent ? GRID_ID : nothing}
+        aria-label=${p.isCurrent ? p.label : nothing}
+        aria-describedby=${p.isCurrent ? HINT_ID : nothing}
+        aria-hidden=${p.isCurrent ? nothing : 'true'}
+        ?inert=${!p.isCurrent}
+        @keydown=${p.isCurrent ? this.onGridKeydown : nothing}
+      >
+        <div class="weekdays" role="row">
+          ${headers.map(
+            (h) => html`<div class="wd" role="columnheader" aria-label=${h.long}>${h.narrow}</div>`
+          )}
+        </div>
+
+        ${p.rows.map(
+          (row) => html`<div class="grid-row" role="row">
+            ${row.map((entry) =>
+              entry
+                ? this.renderDay(entry.cell, entry.muted, valDate, now, p.focusKey, p.label, p.isCurrent)
+                : html`<span class="empty" role="gridcell" aria-disabled="true"></span>`
+            )}
+          </div>`
+        )}
       </div>
     `;
   }
@@ -1245,7 +1400,8 @@ export class DateCalendar extends LitElement {
     valDate: Date | null,
     now: Date,
     fk: string,
-    headerLabel: string
+    headerLabel: string,
+    isCurrent: boolean
   ) {
     const isSel = valDate != null && toISO(c.greg) === toISO(valDate);
     const isToday =
@@ -1265,10 +1421,10 @@ export class DateCalendar extends LitElement {
       type="button"
       role="gridcell"
       data-iso=${iso}
-      tabindex=${iso === fk ? '0' : '-1'}
+      tabindex=${isCurrent && iso === fk ? '0' : '-1'}
       aria-selected=${isSel ? 'true' : 'false'}
       aria-label=${label}
-      @click=${() => this.pickDay(c.greg)}
+      @click=${isCurrent ? () => this.pickDay(c.greg) : nothing}
     >
       ${c.dayDisplay}
     </button>`;

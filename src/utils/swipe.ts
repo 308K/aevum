@@ -72,3 +72,33 @@ export function applySwipeResistance(
   if (abs <= max) return dx;
   return Math.sign(dx) * (max + (abs - max) * 0.35);
 }
+
+/** 轨道几何：面板数与当前面板索引 -> 三个 CSS 变量 */
+export interface TrackGeometry {
+  /** 轨道总宽（相对视口）：面板数 × 100% */
+  trackWidth: string;
+  /** 轨道左移量：把当前面板对齐到视口左边 */
+  trackShift: string;
+  /** 单面板宽（相对轨道）：均分 */
+  panelWidth: string;
+}
+
+/**
+ * 计算滑动轨道的 CSS 几何。
+ * 每个面板恰好等于一个视口宽，故左移 currentIndex × 100% 即可对齐当前面板；
+ * 翻页时轨道再整体平移 ±100%（一个面板宽）即滑到相邻月。
+ */
+export function trackGeometry(panelCount: number, currentIndex: number): TrackGeometry {
+  const n = Math.max(1, Math.floor(panelCount));
+  const idx = Math.min(Math.max(Math.floor(currentIndex), 0), n - 1);
+  return {
+    trackWidth: `${n * 100}%`,
+    trackShift: `-${idx * 100}%`,
+    panelWidth: `${100 / n}%`,
+  };
+}
+
+/** 轨道翻页的位移（px）：dir=1（下一月）向左，dir=-1 向右 */
+export function trackTurnOffset(dir: -1 | 1, panelWidthPx: number): number {
+  return -dir * panelWidthPx;
+}
