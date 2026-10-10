@@ -45,9 +45,8 @@ Aevum 是一个极简倒数日 PWA：纯前端单页应用（SPA），可离线�
 - **Temporal era 与 Intl era 不一致**：Temporal 返回英文小写 era（如 `"reiwa"`），Intl 返回本地化 era（如 `"令和"`）。`resolveYearStart()` 在搜索日本和历年份时使用 Intl 匹配 era，而非 Temporal 的 era 属性。
 
 ## Testing instructions
-回归主门禁是 Vitest（见下节）；smoke 脚本已收敛为仅保留一个不可替代的：
-- `deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts` —— Temporal 交叉验证：与 Vitest 覆盖相同的断言，但使用 Deno 原生 Temporal 跑（验证 Bun polyfill 路径与原生实现一致）。曾与其重复的其余 smoke 脚本已删除，覆盖已并入对应 `tests/*.test.ts`。
-修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑 `bun run test`；涉及 Temporal 语义的改动另跑 Deno 交叉验证。
+回归主门禁是 Vitest（见下节）。曾保留的 Deno Temporal 交叉验证 smoke 脚本（`scripts/smoke-temporal.ts`）已于 2026-10-10 移除——Bun 原生支持 Temporal 后交叉验证不再必要，其覆盖早已并入对应 `tests/*.test.ts`。
+修改 `utils/calendar.ts`、`utils/time-calc.ts` 或 `store/themes.ts` 后务必跑 `bun run test`。
 
 ## Vitest 测试
 项目已引入 **Vitest** 作为自动化测试框架，测试文件位于 `tests/` 目录：

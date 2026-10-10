@@ -89,12 +89,6 @@ bun run test:coverage # 带覆盖率报告
 
 GitHub Actions CI 在每次 push / PR 时自动运行 `typecheck` + `test`（[CI 状态](https://github.com/308K/aevum/actions/workflows/ci.yml)）。
 
-此外保留一个冒烟脚本，用于用 Deno 原生 Temporal 验证与 Bun（polyfill）路径的一致性：
-
-```bash
-deno run --no-prompt --allow-read --allow-env scripts/smoke-temporal.ts
-```
-
 ## 部署
 
 ### Cloudflare Pages（推荐）
@@ -129,8 +123,6 @@ aevum/
 ├── public/
 │   ├── icons/                  # PWA 图标（SVG）
 │   └── robots.txt
-├── scripts/                    # Deno 交叉验证脚本
-│   └── smoke-temporal.ts       # Deno 原生 Temporal 兼容性
 ├── tests/                      # Vitest 自动化测试（345 条断言）
 │   ├── setup.ts                # 测试环境垫片（localStorage / navigator / i18n）
 │   ├── calendar.test.ts        # 历法转换 / 纪元 / 差值 / 循环 / 网格 / 表头
