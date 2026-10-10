@@ -229,6 +229,11 @@ export class DateCalendar extends LitElement {
       gap: 2px;
       flex: none;
       width: var(--panel-w, 33.3333%);
+      transition: opacity 0.15s ease;
+    }
+    /* 拖拽中给邻月降透明度，强调当前页；翻页动画阶段（anim）不降，避免滑入的邻月半透明 */
+    .viewport.dragging .panel:not(.current) {
+      opacity: 0.4;
     }
     /* 仅在松手后的动画阶段开启过渡，拖拽过程必须即时跟手 */
     .viewport.anim .track {
@@ -465,6 +470,8 @@ export class DateCalendar extends LitElement {
   @state() private dragX = 0;
   /** 是否处于进出场动画阶段（决定 .track 是否启用 transition） */
   @state() private animating = false;
+  /** 横向拖拽进行中（决定邻月面板降透明度）；纵向手势不置真 */
+  @state() private dragging = false;
   /** 正在跟踪的指针 id，非 null 表示手势进行中 */
   private swipePointerId: number | null = null;
   private swipeStartX = 0;
@@ -921,12 +928,14 @@ export class DateCalendar extends LitElement {
     }
     if (this.swipeAxis !== 'horizontal') return;
     e.preventDefault();
+    this.dragging = true;
     this.dragX = applySwipeResistance(dx, this.swipeWidth);
   }
 
   private onSwipePointerUp(e: PointerEvent) {
     if (this.swipePointerId !== e.pointerId) return;
     this.swipePointerId = null;
+    this.dragging = false;
     if (this.swipeAxis !== 'horizontal') {
       this.dragX = 0;
       return;
@@ -948,6 +957,7 @@ export class DateCalendar extends LitElement {
     if (this.swipePointerId !== e.pointerId) return;
     this.swipePointerId = null;
     this.swipeAxis = 'none';
+    this.dragging = false;
     this.dragX = 0;
   }
 
@@ -1333,7 +1343,7 @@ export class DateCalendar extends LitElement {
         <p class="hint" id=${HINT_ID}>${t('calKeyboardHint')}</p>
 
         <div
-          class="viewport ${this.animating ? 'anim' : ''}"
+          class="viewport ${this.animating ? 'anim' : ''} ${this.dragging ? 'dragging' : ''}"
           @pointerdown=${this.onSwipePointerDown}
           @pointermove=${this.onSwipePointerMove}
           @pointerup=${this.onSwipePointerUp}
@@ -1366,7 +1376,7 @@ export class DateCalendar extends LitElement {
   ) {
     return html`
       <div
-        class="panel"
+        class="panel ${p.isCurrent ? 'current' : ''}"
         role="grid"
         id=${p.isCurrent ? GRID_ID : nothing}
         aria-label=${p.isCurrent ? p.label : nothing}
