@@ -54,7 +54,9 @@ import { CALENDAR_IDS } from '../utils/calendar.js';
 import { exportBackup, importBackup } from '../utils/backup.js';
 import { icon } from '../icons.js';
 import { toast, toastError } from '../components/app-snackbar.js';
+import { UPDATE_STATUS_KEYS, type UpdateStatus } from '../utils/update-state.js';
 import { isInstallable, onInstallAvailable, promptInstall } from '../install.js';
+import { checkForUpdate, getUpdateState, isUpdateSupported, onUpdateState } from '../update.js';
 import '../components/color-picker.js';
 
 const GRAN_I18N_KEYS: Record<Granularity, 'granDay' | 'granDhms' | 'granYmd' | 'granYwd' | 'granWd'> = {
@@ -339,6 +341,7 @@ export class SettingsPage extends LitElement {
   @state() private newThemeName = '';
   @state() private newThemeColor = getSettings().seedColor;
   @state() private installAvailable = isInstallable();
+  @state() private updateStatus: UpdateStatus = getUpdateState().status;
 
   @query('#tagDeleteDialog') private tagDeleteDialog!: MdDialog;
   private pendingDeleteId: string | null = null;
@@ -350,6 +353,7 @@ export class SettingsPage extends LitElement {
   private unsubLocale?: () => void;
   private unsubTags?: () => void;
   private unsubInstall?: () => void;
+  private unsubUpdate?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
@@ -360,6 +364,7 @@ export class SettingsPage extends LitElement {
       this.installAvailable = isInstallable();
       this.requestUpdate();
     });
+    this.unsubUpdate = onUpdateState((next) => (this.updateStatus = next.status));
   }
 
   disconnectedCallback() {
@@ -368,6 +373,7 @@ export class SettingsPage extends LitElement {
     this.unsubLocale?.();
     this.unsubTags?.();
     this.unsubInstall?.();
+    this.unsubUpdate?.();
   }
 
   private set<K extends keyof AevumSettings>(key: K, value: AevumSettings[K]) {
@@ -447,6 +453,19 @@ export class SettingsPage extends LitElement {
     else toast(t('installManualHint'));
   }
 
+  private async onCheckUpdate() {
+    if (!isUpdateSupported()) {
+      toastError(t('updateStatusUnsupported'));
+      return;
+    }
+    const started = await checkForUpdate();
+    if (!started) return;
+    const status = getUpdateState().status;
+    if (status === 'available') toast(t('toastUpdateFound'));
+    else if (status === 'error') toastError(t('toastUpdateFailed'));
+    else toast(t('toastUpdateUpToDate'));
+  }
+
   private requestDeleteTheme(id: string) {
     this.pendingDeleteThemeId = id;
     this.themeDeleteDialog.show();
@@ -521,6 +540,20 @@ export class SettingsPage extends LitElement {
                 >
                   ${icon('download', 20)}
                 </md-icon-button>`}
+          </div>
+          <div class="item">
+            <div>
+              <div class="label">${t('settingsCheckUpdate')}</div>
+              <div class="hint">${t('settingsCheckUpdateHint')}</div>
+              <div class="hint">${t(UPDATE_STATUS_KEYS[this.updateStatus])}</div>
+            </div>
+            <md-outlined-button
+              ?disabled=${this.updateStatus === 'checking' || this.updateStatus === 'applying'}
+              @click=${this.onCheckUpdate}
+            >
+              <span class="btn-icon" slot="icon">${icon('refresh', 18)}</span>
+              ${this.updateStatus === 'checking' ? t('updateStatusChecking') : t('settingsCheckUpdate')}
+            </md-outlined-button>
           </div>
         </div>
       </div>

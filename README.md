@@ -42,6 +42,7 @@
 ### 体验
 
 - **中英文界面**：跟随系统或手动切换，词典式 i18n。
+- **更新检测与提醒**：Service Worker 采用 `prompt` 模式，新版本就绪时不静默接管，而是在所有页面顶部弹出提示横幅，用户确认后才切换并刷新；设置页提供手动「检查更新」，页面重新可见时按 1 小时间隔自动检查一次。
 - **无障碍**：日历式日期选择器实现完整 WAI-ARIA Grid 键盘模型（方向键移动、Home/End 本月首末、PageUp·Down 换月、Shift+PageUp·Down 换年、Enter/Space 选择）与读屏语义（role=grid、sr-only 操作提示）；年份/月份选择视图同样可全程键盘操作（方向键移动、Enter 选择、Esc 返回，焦点自动移入视图并在返回时交还日期网格）；应用级 Esc 分级返回（对话框/菜单优先处理 → 文本框失焦 → 子页面返回主页）；支持本地化周起始日与多历法月份切换；全局适配 `prefers-reduced-motion`，关键提示带 ARIA 实时区域。
 - **手势翻页**：日期网格支持左右滑动切换月份，拖拽实时跟手（超过视口一半后加阻尼），松手按位移（44px）或速度（0.35px/ms 轻扫）判定翻页，不足则弹回；纵向滑动仍交还页面滚动，翻页后的 click 会被拦截以免误选日期。相邻月份以三面板轨道预渲染（`[前月, 当前月, 后月]`），滑动全程无白屏；邻月面板整体 `inert` + `aria-hidden`，不污染读屏与 Tab 序。
 - **PWA 离线可用**：可安装到主屏，无网络也能查看。
@@ -56,7 +57,7 @@
 | 日期/历法 | [TC39 Temporal API](https://tc39.es/proposal-temporal/) | 原生优先，按需回退 `temporal-polyfill` |
 | 构建 | [Vite 5](https://vitejs.dev/) + [vite-plugin-pwa](https://vite-pwa-org.netlify.app/) | 路由级代码分割 + Service Worker |
 | 语言 | [TypeScript](https://www.typescriptlang.org/) | 严格类型，`tsc --noEmit` 检查 |
-| 测试 | [Vitest](https://vitest.dev/) | 345 条断言，CI 集成 |
+| 测试 | [Vitest](https://vitest.dev/) | 384 条断言，CI 集成 |
 | 包管理 | [Bun](https://bun.sh/) | 依赖安装与脚本运行 |
 
 ### 性能优化
@@ -105,6 +106,17 @@ GitHub Actions CI 在每次 push / PR 时自动运行 `typecheck` + `test`（[CI
 
 PWA（service worker + manifest）由 vite-plugin-pwa 自动生成，构建后含 `sw.js` 与 Web App Manifest。
 
+### 应用更新
+
+`vite.config.ts` 中 `registerType: 'prompt'` —— 生成的 `sw.js` 不再于 install 阶段无条件 `skipWaiting()`，而是注册 `message` 监听器等待客户端发 `SKIP_WAITING`。流程如下：
+
+1. `src/update.ts` 的 `initUpdateWatcher()` 调用 `registerSW({ immediate: true, onNeedRefresh })`
+2. 浏览器检测到新 `sw.js` → 新 SW 下载并进入 `waiting` → workbox-window 派发 `waiting` 事件 → `onNeedRefresh` → 状态置为 `available`
+3. `app.ts` 顶部渲染更新横幅（全页面可见，含设置页），用户点「立即更新」→ `applyUpdate()` 发 `SKIP_WAITING` → 新 SW 接管 → `controlling` 事件触发自动 reload
+4. 用户点「稍后」仅隐藏横幅，更新仍在等待，下次加载继续提示
+
+手动检查入口在设置页「检查更新」；`visibilitychange` 时若距上次检查超过 1 小时会再自动检查一次（限流逻辑见 `utils/update-state.ts` 的 `shouldAutoCheck`）。
+
 ### 构建版本页脚
 
 设置页页脚展示当前部署对应的 commit id（链接到 GitHub 仓库的对应 commit）。构建期通过 `vite.config.ts` 的 `define` 注入：优先取 Cloudflare Pages 的 `COMMIT_REF` 环境变量，本地构建回退 `git rev-parse --short HEAD`；两者均不可用时页脚自动隐藏。
@@ -132,6 +144,7 @@ aevum/
 │   ├── dst.test.ts             # DST 回归（16 种非公历经法）
 │   ├── recur.test.ts           # 日本和历改元循环
 │   ├── era-transition.test.ts  # 改元边界枚举/往返
+│   ├── update-state.test.ts    # 更新状态机迁移 / 自动检查限流 / i18n 键覆盖
 │   └── overflow.test.ts        # 全历法循环策略（dayOverflow / leapMonthStrategy）
 └── src/
     ├── main.ts                 # 入口：全局样式 / M3 组件注册 / 设置初始化 / SW 注册
@@ -141,6 +154,7 @@ aevum/
     ├── i18n.ts                 # 国际化入口
     ├── icons.ts                # 内联 SVG 图标
     ├── install.ts              # PWA 安装提示
+    ├── update.ts               # 应用更新检测（封装 virtual:pwa-register）
     ├── tick.ts                 # 每秒 tick（dhms 粒度用）
     ├── styles/
     │   └── global.css          # 全局样式
@@ -170,6 +184,7 @@ aevum/
     │   ├── image-file.ts       # 图片压缩处理
     │   ├── app-icon.ts        # 应用图标动态生成
     │   ├── swipe.ts            # 滑动翻页：手势判定 + 轨道几何（trackGeometry）
+    │   ├── update-state.ts     # 更新状态机（纯函数迁移规则 + i18n 键映射）
     │   └── format.ts           # 格式化辅助
     └── locales/                # 国际化词典
         ├── zh-CN.ts            # 简体中文
@@ -219,7 +234,7 @@ AevumApp (app.ts) ── 哈希路由
 - 所有可见 UI 文案必须通过 `t(key)` 走 i18n，禁止硬编码
 - 图标使用 `src/icons.ts` 内联 SVG，禁止 emoji 或外部图标字体
 - 历法与时间计算一律走 TC39 Temporal API（通过 `src/utils/temporal.ts` 桥接），禁止引入重型日期库
-- 修改 `utils/calendar.ts`、`utils/time-calc.ts`、`utils/swipe.ts`、`store/` 后运行 `bun run test` 确保无回归
+- 修改 `utils/calendar.ts`、`utils/time-calc.ts`、`utils/swipe.ts`、`utils/update-state.ts`、`store/` 后运行 `bun run test` 确保无回归
 - 主题色由种子色动态生成 M3 色阶，禁止硬编码色值覆盖动态主题
 - 新增语言须在 `src/locales/` 新建词典文件并注册到 `src/i18n.ts` 的 `DICTS`
 

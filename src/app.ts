@@ -11,6 +11,7 @@ import { applyTheme } from './theme.js';
 import { applyLocalePref, onLocaleChange, t } from './i18n.js';
 import { icon } from './icons.js';
 import { isInstallable, onInstallAvailable, promptInstall } from './install.js';
+import { applyUpdate, getUpdateState, onUpdateState } from './update.js';
 import { toast } from './components/app-snackbar.js';
 
 /* 首屏页面立即加载（主页是初始视图） */
@@ -76,6 +77,11 @@ export class AevumApp extends LitElement {
       outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 3px;
     }
+    .update-banner md-icon-button:has(:focus-visible),
+    .update-banner md-filled-button:has(:focus-visible) {
+      outline: 2px solid var(--md-sys-color-tertiary);
+      outline-offset: 2px;
+    }
     .install-banner {
       display: flex;
       align-items: center;
@@ -113,11 +119,51 @@ export class AevumApp extends LitElement {
       flex: none;
       color: var(--md-sys-color-on-primary-container);
     }
+    /* 更新提示横幅：使用 tertiary 容器色与安装横幅区分 */
+    .update-banner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin: 4px 0 12px;
+      padding: 12px 14px;
+      border-radius: 18px;
+      background: color-mix(in oklch, var(--md-sys-color-tertiary-container) 78%, transparent);
+      border: 1px solid color-mix(in oklch, var(--md-sys-color-tertiary) 35%, transparent);
+    }
+    .update-banner .update-icon {
+      flex: none;
+      display: inline-flex;
+      color: var(--md-sys-color-on-tertiary-container);
+    }
+    .update-banner .update-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .update-banner .update-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--md-sys-color-on-tertiary-container);
+    }
+    .update-banner .update-sub {
+      font-size: 0.76rem;
+      color: var(--md-sys-color-on-tertiary-container);
+      opacity: 0.85;
+      margin-top: 2px;
+    }
+    .update-banner .update-btn {
+      flex: none;
+    }
+    .update-banner .update-close {
+      flex: none;
+      color: var(--md-sys-color-on-tertiary-container);
+    }
     @media (max-width: 480px) {
-      .install-banner {
+      .install-banner,
+      .update-banner {
         flex-wrap: wrap;
       }
-      .install-banner .install-btn {
+      .install-banner .install-btn,
+      .update-banner .update-btn {
         margin-left: auto;
       }
     }
@@ -168,10 +214,13 @@ export class AevumApp extends LitElement {
   @state() private themeMode: 'light' | 'dark' = 'light';
   @state() private installAvailable = isInstallable();
   @state() private installDismissed = false;
+  @state() private updateStatus = getUpdateState().status;
+  @state() private updateDismissed = false;
 
   private unsubSettings?: () => void;
   private unsubLocale?: () => void;
   private unsubInstall?: () => void;
+  private unsubUpdate?: () => void;
 
   /**
    * 应用级 Esc 分级返回（捕获阶段，优先级从高到低）：
@@ -220,6 +269,9 @@ export class AevumApp extends LitElement {
       this.installAvailable = isInstallable();
       this.requestUpdate();
     });
+    this.unsubUpdate = onUpdateState((next) => {
+      this.updateStatus = next.status;
+    });
     window.addEventListener('hashchange', this.onHashChange);
     // 捕获阶段：确保在 md-select/md-menu 等 stopPropagation 之前仍能收到 Escape
     window.addEventListener('keydown', this.onGlobalKeydown, { capture: true });
@@ -231,6 +283,7 @@ export class AevumApp extends LitElement {
     this.unsubSettings?.();
     this.unsubLocale?.();
     this.unsubInstall?.();
+    this.unsubUpdate?.();
     window.removeEventListener('hashchange', this.onHashChange);
     window.removeEventListener('keydown', this.onGlobalKeydown, { capture: true });
   }
@@ -289,6 +342,11 @@ export class AevumApp extends LitElement {
     else toast(t('installManualHint'));
   }
 
+  private onApplyUpdate() {
+    toast(t('toastUpdating'));
+    void applyUpdate();
+  }
+
   private get pageTitle(): string {
     if (this.route === 'settings') return t('pageSettingsTitle');
     if (this.route === 'share-image') return t('pageShareImageTitle');
@@ -322,6 +380,25 @@ export class AevumApp extends LitElement {
       </header>
 
       <main>
+        ${this.updateStatus === 'available' && !this.updateDismissed
+          ? html`<div class="update-banner" role="region" aria-label=${t('updateBannerTitle')}>
+              <span class="update-icon">${icon('systemUpdate', 24)}</span>
+              <div class="update-text">
+                <div class="update-title">${t('updateBannerTitle')}</div>
+                <div class="update-sub">${t('updateBannerHint')}</div>
+              </div>
+              <md-filled-button class="update-btn" @click=${this.onApplyUpdate}>
+                <span slot="icon" style="display:inline-flex">${icon('refresh', 18)}</span>${t('updateNow')}
+              </md-filled-button>
+              <md-icon-button
+                class="update-close"
+                @click=${() => (this.updateDismissed = true)}
+                aria-label=${t('actionLater')}
+              >
+                ${icon('close', 20)}
+              </md-icon-button>
+            </div>`
+          : null}
         ${this.route === 'home' && this.installAvailable && !this.installDismissed
           ? html`<div class="install-banner" role="region" aria-label=${t('installToHome')}>
               <span class="install-icon">${icon('download', 24)}</span>

@@ -25,7 +25,7 @@ export default defineConfig({
   },
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icons/*.svg'],
       manifest: {
         id: 'app.aevum.countdown',

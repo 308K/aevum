@@ -299,6 +299,25 @@ export const zhCN = {
   installManualHint: '未检测到自动安装入口。请在浏览器菜单中选择「添加到主屏幕」即可安装本应用。',
   toastInstalled: '已安装到主屏幕',
   toastInstallCancelled: '已取消安装',
+
+  // 应用更新（Service Worker）
+  updateBannerTitle: '发现新版本',
+  updateBannerHint: '新版本已下载完成，点击更新即可立即使用',
+  updateNow: '立即更新',
+  actionLater: '稍后',
+  updateApplying: '正在更新…',
+  updateStatusIdle: '尚未检查更新',
+  updateStatusChecking: '正在检查更新…',
+  updateStatusAvailable: '有新版本可用',
+  updateStatusApplying: '正在更新…',
+  updateStatusError: '检查更新失败，请检查网络连接',
+  updateStatusUnsupported: '当前环境不支持自动更新',
+  settingsCheckUpdate: '检查更新',
+  settingsCheckUpdateHint: '手动检查是否有新版本可用；新版本就绪后会在顶部提示',
+  toastUpdateUpToDate: '已是最新版本',
+  toastUpdateFound: '发现新版本',
+  toastUpdateFailed: '更新检查失败，请检查网络连接',
+  toastUpdating: '正在更新到新版本…',
 };
 
 export type LocaleDict = typeof zhCN;

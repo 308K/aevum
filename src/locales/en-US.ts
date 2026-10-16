@@ -289,4 +289,23 @@ export const enUS: LocaleDict = {
   installManualHint: 'No automatic install prompt detected. Open your browser menu and choose "Add to Home Screen" to install this app.',
   toastInstalled: 'Installed to home screen',
   toastInstallCancelled: 'Installation cancelled',
+
+  // App updates (Service Worker)
+  updateBannerTitle: 'Update available',
+  updateBannerHint: 'The new version is ready. Tap update to start using it right away.',
+  updateNow: 'Update now',
+  actionLater: 'Later',
+  updateApplying: 'Updating…',
+  updateStatusIdle: 'Update not checked yet',
+  updateStatusChecking: 'Checking for updates…',
+  updateStatusAvailable: 'A new version is available',
+  updateStatusApplying: 'Updating…',
+  updateStatusError: 'Could not check for updates. Check your connection.',
+  updateStatusUnsupported: 'Automatic updates are not supported here',
+  settingsCheckUpdate: 'Check for updates',
+  settingsCheckUpdateHint: 'Check manually for a new version; you will be notified at the top when one is ready.',
+  toastUpdateUpToDate: 'You are up to date',
+  toastUpdateFound: 'Update available',
+  toastUpdateFailed: 'Could not check for updates. Check your connection.',
+  toastUpdating: 'Updating to the new version…',
 };

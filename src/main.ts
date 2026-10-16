@@ -18,11 +18,11 @@ import '@material/web/select/outlined-select.js';
 import '@material/web/select/select-option.js';
 import '@material/web/switch/switch.js';
 
-import { registerSW } from 'virtual:pwa-register';
 import { getSettings, onSettingsChange } from './store/settings.js';
 import { applyLocalePref } from './i18n.js';
 import { applyTheme } from './theme.js';
 import { initInstall } from './install.js';
+import { initUpdateWatcher } from './update.js';
 import { ensureTemporalReady } from './utils/temporal.js';
 import './app.js';
 
@@ -39,10 +39,8 @@ function bootstrapSettings() {
 
 bootstrapSettings();
 
-/* PWA：注册 Service Worker（离线缓存 + 自动更新） */
-if ('serviceWorker' in navigator) {
-  registerSW({ immediate: true });
-}
+/* PWA：注册 Service Worker（离线缓存）并开启更新检测（新版本就绪时提醒用户） */
+initUpdateWatcher();
 
 /* PWA：捕获「安装到主屏幕」提示事件 */
 initInstall();
