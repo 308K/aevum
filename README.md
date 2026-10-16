@@ -117,9 +117,9 @@ PWA（service worker + manifest）由 vite-plugin-pwa 自动生成，构建后�
 
 手动检查入口在设置页「检查更新」；`visibilitychange` 时若距上次检查超过 1 小时会再自动检查一次（限流逻辑见 `utils/update-state.ts` 的 `shouldAutoCheck`）。
 
-### 构建版本页脚
+### 构建版本
 
-设置页页脚展示当前部署对应的 commit id（链接到 GitHub 仓库的对应 commit）。构建期通过 `vite.config.ts` 的 `define` 注入：优先取 Cloudflare Pages 的 `COMMIT_REF` 环境变量，本地构建回退 `git rev-parse --short HEAD`；两者均不可用时页脚自动隐藏。
+设置页「检查更新」项内展示当前部署对应的 commit id（链接到 GitHub 仓库的对应 commit）。构建期通过 `vite.config.ts` 的 `define` 注入：优先取 Cloudflare Pages 的 `COMMIT_REF` 环境变量，本地构建回退 `git rev-parse --short HEAD`；两者均不可用时该行自动隐藏。
 
 ## 项目结构
 

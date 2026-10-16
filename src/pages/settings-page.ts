@@ -216,6 +216,25 @@ export class SettingsPage extends LitElement {
       display: inline-flex;
       align-items: center;
     }
+    /* 检查更新项：按钮文案随状态切换，需预留最长文案宽度以免左侧文字重排跳动 */
+    .item-update .update-text {
+      flex: 1;
+      min-width: 0;
+    }
+    .update-btn-wrap {
+      display: grid;
+      grid-template-areas: 'btn';
+      justify-items: end;
+      flex: none;
+    }
+    .update-btn-wrap > md-outlined-button {
+      grid-area: btn;
+    }
+    /* 撑位按钮只参与宽度计算，不可见也不可聚焦 */
+    .update-btn-wrap > .btn-sizer {
+      visibility: hidden;
+      pointer-events: none;
+    }
     .data-actions {
       display: flex;
       gap: 10px;
@@ -233,6 +252,18 @@ export class SettingsPage extends LitElement {
       }
       .item.item-data .data-actions md-outlined-button {
         flex: 1;
+      }
+      /* 窄屏：检查更新按钮移到文字下方整行，避免与说明文字互相挤压 */
+      .item.item-update {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+      }
+      .item.item-update .update-btn-wrap {
+        justify-items: stretch;
+      }
+      .item.item-update .update-btn-wrap > md-outlined-button {
+        width: 100%;
       }
     }
     .hidden-input {
@@ -317,18 +348,19 @@ export class SettingsPage extends LitElement {
       border-radius: 999px;
       white-space: nowrap;
     }
-    .build-footer {
-      margin: 24px 4px 12px;
-      text-align: center;
-      font-size: 0.75rem;
+    /* 构建版本号：内联在「检查更新」说明下方 */
+    .build-version {
+      margin-top: 6px;
+      font-size: 0.72rem;
       color: var(--md-sys-color-on-surface-variant);
+      opacity: 0.8;
     }
-    .build-footer a {
+    .build-version a {
       color: inherit;
       text-decoration: underline;
       text-underline-offset: 3px;
     }
-    .build-footer a:focus-visible {
+    .build-version a:focus-visible {
       outline: 2px solid var(--md-sys-color-primary);
       outline-offset: 2px;
       border-radius: 4px;
@@ -383,6 +415,13 @@ export class SettingsPage extends LitElement {
       value = DEFAULT_SETTINGS.defaultCalendar as AevumSettings[K];
     }
     updateSettings({ [key]: value });
+  }
+
+  /** 检查更新按钮在两种状态下的较长文案（用于撑位，避免切换时按钮宽度变化） */
+  private get updateBtnLongLabel(): string {
+    const idle = t('settingsCheckUpdate');
+    const checking = t('updateStatusChecking');
+    return checking.length >= idle.length ? checking : idle;
   }
 
   /* ---------- 标签（分类）管理 ---------- */
@@ -541,19 +580,47 @@ export class SettingsPage extends LitElement {
                   ${icon('download', 20)}
                 </md-icon-button>`}
           </div>
-          <div class="item">
-            <div>
+          <div class="item item-update">
+            <div class="update-text">
               <div class="label">${t('settingsCheckUpdate')}</div>
               <div class="hint">${t('settingsCheckUpdateHint')}</div>
               <div class="hint">${t(UPDATE_STATUS_KEYS[this.updateStatus])}</div>
+              ${COMMIT_ID
+                ? html`<div class="build-version">
+                    ${t('buildCommitLabel')}:
+                    <a
+                      href="https://github.com/308K/aevum/commit/${COMMIT_ID}"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label=${t('buildCommitAria', { commit: COMMIT_ID })}
+                      >${COMMIT_ID}</a
+                    >
+                  </div>`
+                : ''}
             </div>
-            <md-outlined-button
-              ?disabled=${this.updateStatus === 'checking' || this.updateStatus === 'applying'}
-              @click=${this.onCheckUpdate}
-            >
-              <span class="btn-icon" slot="icon">${icon('refresh', 18)}</span>
-              ${this.updateStatus === 'checking' ? t('updateStatusChecking') : t('settingsCheckUpdate')}
-            </md-outlined-button>
+            <div class="update-btn-wrap">
+              <!--
+                宽度撑位：渲染两种状态中文案里较长的那个，使按钮在「检查更新」↔「正在检查更新…」
+                之间切换时宽度恒定，避免左侧文字被挤窄后重排跳动。
+                用同一个 md-outlined-button 撑位，padding / gap / font 与真实按钮天然一致，
+                不必硬编码像素；aria-hidden + visibility:hidden 使其退出无障碍树与 Tab 序。
+              -->
+              <md-outlined-button
+                class="btn-sizer"
+                aria-hidden="true"
+                tabindex="-1"
+                ?disabled=${true}
+              >
+                <span class="btn-icon" slot="icon">${icon('refresh', 18)}</span>${this.updateBtnLongLabel}
+              </md-outlined-button>
+              <md-outlined-button
+                ?disabled=${this.updateStatus === 'checking' || this.updateStatus === 'applying'}
+                @click=${this.onCheckUpdate}
+              >
+                <span class="btn-icon" slot="icon">${icon('refresh', 18)}</span>
+                ${this.updateStatus === 'checking' ? t('updateStatusChecking') : t('settingsCheckUpdate')}
+              </md-outlined-button>
+            </div>
           </div>
         </div>
       </div>
@@ -884,19 +951,6 @@ export class SettingsPage extends LitElement {
           </div>
         </div>
       </div>
-
-      ${COMMIT_ID
-        ? html`<footer class="build-footer">
-            ${t('buildCommitLabel')}:
-            <a
-              href="https://github.com/308K/aevum/commit/${COMMIT_ID}"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label=${t('buildCommitAria', { commit: COMMIT_ID })}
-              >${COMMIT_ID}</a
-            >
-          </footer>`
-        : ''}
 
       <md-dialog id="tagDeleteDialog">
         <div slot="headline">${t('tagDeleteConfirmTitle')}</div>
